@@ -1,0 +1,86 @@
+{
+  "policyId": "valeris-stop-conditions-v1",
+  "profiles": {
+    "strict_approval": {
+      "onMatch": "stop",
+      "conditionIds": [
+        "budget_exhausted",
+        "approval_timeout",
+        "authority_violation",
+        "high_risk_conflict"
+      ],
+      "maxRetries": 0,
+      "escalateTo": "human"
+    },
+    "balanced": {
+      "onMatch": "degrade",
+      "conditionIds": [
+        "budget_exhausted",
+        "evidence_conflict",
+        "runtime_unhealthy"
+      ],
+      "maxRetries": 1,
+      "escalateTo": "policy_engine"
+    },
+    "fast_fail": {
+      "onMatch": "stop",
+      "conditionIds": [
+        "latency_exhausted",
+        "runtime_unhealthy"
+      ],
+      "maxRetries": 0,
+      "escalateTo": "none"
+    }
+  },
+  "conditionsCatalog": [
+    {
+      "id": "budget_exhausted",
+      "signal": "budgets.remainingCostUsd",
+      "operator": "lte",
+      "threshold": 0,
+      "description": "预算耗尽立即触发。"
+    },
+    {
+      "id": "latency_exhausted",
+      "signal": "budgets.remainingLatencyMs",
+      "operator": "lte",
+      "threshold": 0,
+      "description": "时延预算耗尽。"
+    },
+    {
+      "id": "approval_timeout",
+      "signal": "state.pendingApprovals",
+      "operator": "gt",
+      "threshold": 0,
+      "description": "存在超时审批项。"
+    },
+    {
+      "id": "authority_violation",
+      "signal": "runtime.authorityViolation",
+      "operator": "eq",
+      "threshold": true,
+      "description": "执行权限越界。"
+    },
+    {
+      "id": "high_risk_conflict",
+      "signal": "risk.level",
+      "operator": "in",
+      "threshold": ["high", "critical"],
+      "description": "高风险且证据冲突。"
+    },
+    {
+      "id": "evidence_conflict",
+      "signal": "state.evidenceConflict",
+      "operator": "eq",
+      "threshold": true,
+      "description": "证据冲突超过阈值。"
+    },
+    {
+      "id": "runtime_unhealthy",
+      "signal": "state.toolHealth",
+      "operator": "eq",
+      "threshold": "unhealthy",
+      "description": "运行时健康状态不可用。"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://valeris-agent.local/contracts/decision-output.schema.json",
+  "title": "Valeris Decision Output Contract",
+  "description": "Valeris 决策引擎输出契约，描述路由结果、执行计划与停止策略。",
+  "type": "object",
+  "required": [
+    "requestId",
+    "decisionId",
+    "selectedStrategy",
+    "selectedRoute",
+    "stopProfile",
+    "reasonCodes",
+    "authorityPlan",
+    "executionPlan",
+    "trace"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "description": "对应输入请求 ID。"
+    },
+    "decisionId": {
+      "type": "string",
+      "description": "本次决策的唯一 ID。"
+    },
+    "selectedStrategy": {
+      "type": "string",
+      "enum": [
+        "local_closed_loop",
+        "delegated_openclaw",
+        "delegated_claude_code",
+        "hybrid_openclaw_claudecode"
+      ],
+      "description": "命中的策略名称。"
+    },
+    "selectedRoute": {
+      "type": "object",
+      "required": ["mode", "runtime", "autonomy", "score"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["local", "delegated", "hybrid"],
+          "description": "路由模式。"
+        },
+        "runtime": {
+          "type": "string",
+          "enum": ["self", "openclaw", "claude_code", "mixed"],
+          "description": "目标运行时。"
+        },
+        "autonomy": {
+          "type": "string",
+          "enum": ["supervised", "plan", "auto", "accept_edits", "bypass"],
+          "description": "自治级别。"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "路由置信度。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "stopProfile": {
+      "type": "string",
+      "description": "停止策略画像名称，需映射到 stop-conditions 合约。"
+    },
+    "activeStopConditions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "本次执行中启用的停止条件 ID 列表。"
+    },
+    "reasonCodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "决策原因代码，用于审计与统计。"
+    },
+    "authorityPlan": {
+      "type": "object",
+      "required": ["approvalsRequired", "requiredCapabilities", "capabilityTokens"],
+      "properties": {
+        "approvalsRequired": {
+          "type": "boolean",
+          "description": "是否需要审批。"
+        },
+        "requiredCapabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "本次执行需要的能力集合。"
+        },
+        "capabilityTokens": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tokenId", "scope", "ttlSeconds"],
+            "properties": {
+              "tokenId": { "type": "string" },
+              "scope": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "ttlSeconds": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "签发的能力令牌列表。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "executionPlan": {
+      "type": "object",
+      "required": ["tasks"],
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["taskId", "runtime", "objective", "role"],
+            "properties": {
+              "taskId": { "type": "string" },
+              "runtime": {
+                "type": "string",
+                "enum": ["self", "openclaw", "claude_code", "mixed"]
+              },
+              "objective": { "type": "string" },
+              "role": { "type": "string" },
+              "dependsOn": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "trace": {
+      "type": "object",
+      "required": ["evaluatedRules", "selectedRule", "timestamp"],
+      "properties": {
+        "evaluatedRules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "selectedRule": {
+          "type": "string",
+          "description": "命中的规则 ID。"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

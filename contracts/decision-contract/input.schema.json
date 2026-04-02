@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://valeris-agent.local/contracts/decision-input.schema.json",
+  "title": "Valeris Decision Input Contract",
+  "description": "Valeris 决策引擎输入契约，定义路由与策略选择所需上下文。",
+  "type": "object",
+  "required": [
+    "requestId",
+    "timestamp",
+    "goal",
+    "risk",
+    "state",
+    "budgets",
+    "capabilityDemand",
+    "governance",
+    "availableRuntimes"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "请求唯一标识。"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "请求发起时间（ISO 8601）。"
+    },
+    "goal": {
+      "type": "object",
+      "required": ["goalType", "intent", "constraints", "successMetrics"],
+      "properties": {
+        "goalType": {
+          "type": "string",
+          "description": "目标类型，例如 token_optimize、charter_quote。"
+        },
+        "domain": {
+          "type": "string",
+          "enum": ["general", "code", "ops", "analysis", "research"],
+          "default": "general",
+          "description": "任务领域标签。"
+        },
+        "intent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "自然语言意图。"
+        },
+        "constraints": {
+          "type": "object",
+          "description": "硬约束集合。",
+          "additionalProperties": true
+        },
+        "successMetrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "成功判定指标列表。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["level"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "风险等级。"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "可选风险分值（0-1）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "object",
+      "required": ["taskComplexity", "evidenceConflict", "toolHealth"],
+      "properties": {
+        "taskComplexity": {
+          "type": "string",
+          "enum": ["simple", "medium", "complex"],
+          "description": "任务复杂度。"
+        },
+        "evidenceConflict": {
+          "type": "boolean",
+          "description": "证据是否冲突。"
+        },
+        "toolHealth": {
+          "type": "string",
+          "enum": ["healthy", "degraded", "unhealthy"],
+          "description": "执行工具健康状态。"
+        },
+        "pendingApprovals": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "待审批项数量。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "budgets": {
+      "type": "object",
+      "required": ["remainingTokens", "remainingCostUsd", "remainingLatencyMs"],
+      "properties": {
+        "remainingTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "剩余 token 预算。"
+        },
+        "remainingCostUsd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "剩余美元预算。"
+        },
+        "remainingLatencyMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "剩余时延预算（毫秒）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilityDemand": {
+      "type": "object",
+      "required": [
+        "readCode",
+        "writeCode",
+        "execCommand",
+        "networkAccess",
+        "externalSideEffects"
+      ],
+      "properties": {
+        "readCode": {
+          "type": "boolean",
+          "description": "是否需要读取代码或文件。"
+        },
+        "writeCode": {
+          "type": "boolean",
+          "description": "是否需要写入代码或配置。"
+        },
+        "execCommand": {
+          "type": "boolean",
+          "description": "是否需要执行命令。"
+        },
+        "networkAccess": {
+          "type": "boolean",
+          "description": "是否需要网络访问。"
+        },
+        "externalSideEffects": {
+          "type": "boolean",
+          "description": "是否会产生外部副作用（发消息、落库、调用外部系统）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "governance": {
+      "type": "object",
+      "required": ["requiresAuditTrail", "approvalMode"],
+      "properties": {
+        "requiresAuditTrail": {
+          "type": "boolean",
+          "description": "是否要求完整审计链路。"
+        },
+        "approvalMode": {
+          "type": "string",
+          "enum": ["none", "ask", "strict"],
+          "description": "审批模式。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "availableRuntimes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["self", "openclaw", "claude_code", "mixed"]
+      },
+      "uniqueItems": true,
+      "description": "当前可用运行时列表。"
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

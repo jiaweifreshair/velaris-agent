@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://valeris-agent.local/contracts/stop-conditions.schema.json",
+  "title": "Valeris Stop Conditions Contract",
+  "description": "Valeris 停止条件契约，定义停止画像与条件目录。",
+  "type": "object",
+  "required": ["policyId", "profiles", "conditionsCatalog"],
+  "properties": {
+    "policyId": {
+      "type": "string",
+      "description": "停止策略版本 ID。"
+    },
+    "profiles": {
+      "type": "object",
+      "description": "停止策略画像集合，key 为 profile 名称。",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "type": "object",
+          "required": ["onMatch", "conditionIds"],
+          "properties": {
+            "onMatch": {
+              "type": "string",
+              "enum": ["stop", "degrade", "retry", "escalate"],
+              "description": "命中条件后的处理动作。"
+            },
+            "conditionIds": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" },
+              "description": "该画像启用的条件 ID。"
+            },
+            "maxRetries": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "允许重试次数。"
+            },
+            "escalateTo": {
+              "type": "string",
+              "enum": ["human", "policy_engine", "none"],
+              "default": "none",
+              "description": "升级目标。"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "conditionsCatalog": {
+      "type": "array",
+      "minItems": 1,
+      "description": "可被复用的停止条件目录。",
+      "items": {
+        "type": "object",
+        "required": ["id", "signal", "operator", "threshold", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "条件 ID。"
+          },
+          "signal": {
+            "type": "string",
+            "description": "运行时信号路径，例如 budgets.remainingCostUsd。"
+          },
+          "operator": {
+            "type": "string",
+            "enum": ["eq", "ne", "gt", "gte", "lt", "lte", "in", "not_in"],
+            "description": "比较操作符。"
+          },
+          "threshold": {
+            "description": "阈值，可为数值、布尔或枚举列表。",
+            "oneOf": [
+              { "type": "number" },
+              { "type": "integer" },
+              { "type": "boolean" },
+              {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" }
+                  ]
+                }
+              }
+            ]
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

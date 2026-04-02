@@ -1,0 +1,163 @@
+version: 1
+policy_id: valeris-dual-mode-routing-v1
+owner: valeris-agent
+updated_at: "2026-04-02T00:00:00Z"
+
+# 规则表达式支持的操作符：eq/ne/gt/gte/lt/lte/in/not_in
+operators:
+  - eq
+  - ne
+  - gt
+  - gte
+  - lt
+  - lte
+  - in
+  - not_in
+
+defaults:
+  strategy: local_closed_loop
+  mode: local
+  runtime: self
+  autonomy: auto
+  stop_profile: balanced
+
+# 停止策略画像，由决策输出中的 stopProfile 引用
+stop_profiles:
+  strict_approval:
+    description: 高风险任务，优先安全，触发即停并升级人工
+    on_match: stop
+    conditions:
+      - id: budget_exhausted
+      - id: approval_timeout
+      - id: authority_violation
+      - id: high_risk_conflict
+  balanced:
+    description: 默认平衡策略，允许有限重试
+    on_match: degrade
+    conditions:
+      - id: budget_exhausted
+      - id: evidence_conflict
+      - id: runtime_unhealthy
+  fast_fail:
+    description: 低价值探索任务，快速失败以节省成本
+    on_match: stop
+    conditions:
+      - id: latency_exhausted
+      - id: runtime_unhealthy
+
+strategies:
+  local_closed_loop:
+    mode: local
+    runtime: self
+    autonomy: auto
+    max_parallel_workers: 2
+    required_capabilities:
+      - read
+      - reason
+  delegated_openclaw:
+    mode: delegated
+    runtime: openclaw
+    autonomy: supervised
+    max_parallel_workers: 4
+    required_capabilities:
+      - read
+      - write
+      - exec
+      - audit
+  delegated_claude_code:
+    mode: delegated
+    runtime: claude_code
+    autonomy: accept_edits
+    max_parallel_workers: 3
+    required_capabilities:
+      - read
+      - write
+      - exec
+  hybrid_openclaw_claudecode:
+    mode: hybrid
+    runtime: mixed
+    autonomy: supervised
+    max_parallel_workers: 5
+    required_capabilities:
+      - read
+      - write
+      - exec
+      - audit
+
+rules:
+  - id: R001_high_risk_go_openclaw
+    priority: 1000
+    when:
+      all:
+        - field: risk.level
+          op: in
+          value: [high, critical]
+    route:
+      strategy: delegated_openclaw
+      stop_profile: strict_approval
+      reason: 高风险任务必须进入治理优先路径
+
+  - id: R002_code_heavy_go_claude_code
+    priority: 900
+    when:
+      all:
+        - field: capabilityDemand.writeCode
+          op: eq
+          value: true
+        - field: state.taskComplexity
+          op: in
+          value: [medium, complex]
+    route:
+      strategy: delegated_claude_code
+      stop_profile: balanced
+      reason: 代码改动密集任务由代码域专家执行
+
+  - id: R003_audit_required_go_openclaw
+    priority: 850
+    when:
+      all:
+        - field: governance.requiresAuditTrail
+          op: eq
+          value: true
+    route:
+      strategy: delegated_openclaw
+      stop_profile: strict_approval
+      reason: 强审计任务优先走任务控制与审计链路
+
+  - id: R004_cross_system_use_hybrid
+    priority: 800
+    when:
+      all:
+        - field: capabilityDemand.externalSideEffects
+          op: eq
+          value: true
+        - field: capabilityDemand.writeCode
+          op: eq
+          value: true
+    route:
+      strategy: hybrid_openclaw_claudecode
+      stop_profile: strict_approval
+      reason: 跨系统副作用 + 代码变更，采用治理+代码双运行时
+
+  - id: R005_simple_local
+    priority: 300
+    when:
+      all:
+        - field: risk.level
+          op: in
+          value: [low, medium]
+        - field: state.taskComplexity
+          op: eq
+          value: simple
+        - field: capabilityDemand.externalSideEffects
+          op: eq
+          value: false
+    route:
+      strategy: local_closed_loop
+      stop_profile: fast_fail
+      reason: 低风险简单任务本地闭环最快
+
+fallback:
+  strategy: local_closed_loop
+  stop_profile: balanced
+  reason: 无规则命中时使用默认本地闭环
