@@ -117,7 +117,7 @@ velaris-agent/
 
 下面是你提到的两个验证项目，与 Velaris 底层引擎的推荐接入方式。
 
-### A. 结合 `flight-compare`（`@flight-compare`）
+### A. 结合 `flight-compare`
 
 `flight-compare` 当前是 `FastAPI + agent-browser` 的旅行比价服务，Velaris 可以承担“判断层与编排层”：
 
@@ -131,7 +131,7 @@ velaris-agent/
 - `flight-compare` 负责数据抓取、供应商接口和前端交互。
 - `velaris-agent` 负责决策编排、策略选择、预算控制与评估沉淀。
 
-### B. 结合 `TokenScope`（路径按你提供：`@Documents/UGit/tokenscope`）
+### B. 结合 `TokenScope`
 
 TokenScope 可直接复用 `tokencost` 场景定义，形成“成本治理中枢”：
 
