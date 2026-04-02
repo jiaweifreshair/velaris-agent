@@ -1,0 +1,24 @@
+{
+  "name": "valeris-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Valeris Agent - AI Decision Runtime Framework",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "dev": "turbo run dev",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
