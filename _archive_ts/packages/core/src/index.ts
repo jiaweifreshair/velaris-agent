@@ -75,6 +75,16 @@ export type {
 
   // 事件
   VelarisEvents,
+  RoutingPolicy,
+  RoutingDecision,
+  RoutingContext,
+  RoutingRule,
+  RoutingStrategy,
+  StopProfileDefinition,
+  AuthorityPlan,
+  CapabilityToken,
+  TaskLedgerRecord,
+  OutcomeRecord,
 } from './types.js';
 
 export { GoalSchema } from './types.js';
@@ -95,6 +105,14 @@ export { Evaluator } from './layers/evaluator.js';
 export { EventBus } from './network/event-bus.js';
 export { AgentNetwork } from './network/agent-network.js';
 export { SubAgent } from './network/sub-agent.js';
+
+// 路由与治理
+export { PolicyRouter } from './policy/router.js';
+export { defaultRoutingPolicy } from './policy/default-routing-policy.js';
+export { AuthorityService } from './governance/authority.js';
+export type { AuthorityConfig } from './governance/authority.js';
+export { TaskLedger } from './control/task-ledger.js';
+export { OutcomeStore } from './eval/outcome-store.js';
 
 // Skill
 export { SkillRegistry } from './skills/registry.js';

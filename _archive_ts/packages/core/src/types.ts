@@ -92,6 +92,294 @@ export interface DecisionResult {
   costEstimate: CostEstimate;
   /** 决策推理（自然语言） */
   reasoning: string;
+  /** 可选：策略路由结果（OpenHarness 二开治理链路） */
+  routing?: RoutingDecision;
+  /** 可选：能力签发计划（最小权限令牌） */
+  authorityPlan?: AuthorityPlan;
+}
+
+// ─── 路由治理（OpenHarness 二开）───────────────────────
+
+/** 风险等级，用于策略路由。 */
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+/** 任务复杂度，供路由规则匹配。 */
+export type TaskComplexity = 'simple' | 'medium' | 'complex';
+
+/** 路由目标运行时。 */
+export type RuntimeTarget = 'self' | 'openclaw' | 'claude_code' | 'mixed';
+
+/** 路由模式。 */
+export type RouteMode = 'local' | 'delegated' | 'hybrid';
+
+/** 自治等级，与执行风险策略联动。 */
+export type AutonomyLevel = 'supervised' | 'plan' | 'auto' | 'accept_edits' | 'bypass';
+
+/** 停止条件命中后的动作。 */
+export type StopAction = 'stop' | 'degrade' | 'retry' | 'escalate';
+
+/** 路由规则支持的比较操作符。 */
+export type PolicyOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'not_in';
+
+/** 路由上下文中的预算快照。 */
+export interface RoutingBudgets {
+  /** 剩余 token 预算。 */
+  remainingTokens: number;
+  /** 剩余美元预算。 */
+  remainingCostUsd: number;
+  /** 剩余时延预算（毫秒）。 */
+  remainingLatencyMs: number;
+}
+
+/** 路由上下文中的能力需求。 */
+export interface CapabilityDemand {
+  /** 是否需要读取代码或文件。 */
+  readCode: boolean;
+  /** 是否需要写代码或配置。 */
+  writeCode: boolean;
+  /** 是否需要执行命令。 */
+  execCommand: boolean;
+  /** 是否需要访问网络。 */
+  networkAccess: boolean;
+  /** 是否有外部副作用（通知/落库/调用外部系统）。 */
+  externalSideEffects: boolean;
+}
+
+/** 路由上下文中的治理要求。 */
+export interface GovernanceDemand {
+  /** 是否要求完整审计链路。 */
+  requiresAuditTrail: boolean;
+  /** 审批模式。 */
+  approvalMode: 'none' | 'ask' | 'strict';
+}
+
+/** 路由上下文中的运行状态。 */
+export interface RoutingState {
+  /** 任务复杂度标签。 */
+  taskComplexity: TaskComplexity;
+  /** 证据是否冲突。 */
+  evidenceConflict: boolean;
+  /** 工具健康状态。 */
+  toolHealth: 'healthy' | 'degraded' | 'unhealthy';
+}
+
+/** 路由输入上下文。 */
+export interface RoutingContext {
+  /** 请求唯一标识。 */
+  requestId: string;
+  /** 请求时间戳。 */
+  timestamp: string;
+  /** 目标对象。 */
+  goal: Goal;
+  /** 风险信息。 */
+  risk: { level: RiskLevel; score?: number };
+  /** 运行状态。 */
+  state: RoutingState;
+  /** 预算快照。 */
+  budgets: RoutingBudgets;
+  /** 能力需求。 */
+  capabilityDemand: CapabilityDemand;
+  /** 治理需求。 */
+  governance: GovernanceDemand;
+  /** 当前可用运行时。 */
+  availableRuntimes: RuntimeTarget[];
+}
+
+/** 路由规则中的叶子条件。 */
+export interface PolicyLeafCondition {
+  /** 字段路径，支持点号访问，例如 risk.level。 */
+  field: string;
+  /** 比较操作符。 */
+  op: PolicyOperator;
+  /** 比较值。 */
+  value: unknown;
+}
+
+/** 路由规则中的组合条件。 */
+export interface PolicyConditionGroup {
+  /** 所有子条件都为真时命中。 */
+  all?: PolicyCondition[];
+  /** 任意子条件为真时命中。 */
+  any?: PolicyCondition[];
+}
+
+/** 路由规则条件（组合条件或叶子条件）。 */
+export type PolicyCondition = PolicyLeafCondition | PolicyConditionGroup;
+
+/** 停止策略画像定义。 */
+export interface StopProfileDefinition {
+  /** 画像说明。 */
+  description: string;
+  /** 条件命中后的动作。 */
+  onMatch: StopAction;
+  /** 启用的停止条件 ID。 */
+  conditionIds: string[];
+  /** 最大重试次数。 */
+  maxRetries?: number;
+  /** 升级目标。 */
+  escalateTo?: 'human' | 'policy_engine' | 'none';
+}
+
+/** 路由策略定义。 */
+export interface RoutingStrategy {
+  /** 路由模式。 */
+  mode: RouteMode;
+  /** 目标运行时。 */
+  runtime: RuntimeTarget;
+  /** 自治等级。 */
+  autonomy: AutonomyLevel;
+  /** 允许并行 worker 数。 */
+  maxParallelWorkers: number;
+  /** 该策略要求的能力集合。 */
+  requiredCapabilities: string[];
+}
+
+/** 命中规则后的路由目标。 */
+export interface RuleRouteTarget {
+  /** 目标策略名。 */
+  strategy: string;
+  /** 停止画像名。 */
+  stopProfile: string;
+  /** 命中原因。 */
+  reason: string;
+}
+
+/** 路由规则定义。 */
+export interface RoutingRule {
+  /** 规则 ID。 */
+  id: string;
+  /** 优先级，越大越先匹配。 */
+  priority: number;
+  /** 匹配条件。 */
+  when: PolicyCondition;
+  /** 命中路由结果。 */
+  route: RuleRouteTarget;
+}
+
+/** 路由策略配置。 */
+export interface RoutingPolicy {
+  /** 策略版本。 */
+  version: number;
+  /** 策略 ID。 */
+  policyId: string;
+  /** 默认策略。 */
+  defaults: RuleRouteTarget;
+  /** 停止画像集合。 */
+  stopProfiles: Record<string, StopProfileDefinition>;
+  /** 策略定义集合。 */
+  strategies: Record<string, RoutingStrategy>;
+  /** 规则列表。 */
+  rules: RoutingRule[];
+  /** 回退策略。 */
+  fallback: RuleRouteTarget;
+}
+
+/** 路由决策结果。 */
+export interface RoutingDecision {
+  /** 命中的策略名。 */
+  selectedStrategy: string;
+  /** 选中的路由详情。 */
+  selectedRoute: {
+    /** 路由模式。 */
+    mode: RouteMode;
+    /** 目标运行时。 */
+    runtime: RuntimeTarget;
+    /** 自治等级。 */
+    autonomy: AutonomyLevel;
+    /** 路由置信度（0-1）。 */
+    score: number;
+  };
+  /** 命中的停止画像。 */
+  stopProfile: string;
+  /** 当前激活的停止条件。 */
+  activeStopConditions: string[];
+  /** 原因码集合。 */
+  reasonCodes: string[];
+  /** 该次路由要求的能力。 */
+  requiredCapabilities: string[];
+  /** 规则追踪信息。 */
+  trace: {
+    /** 参与评估的规则列表。 */
+    evaluatedRules: string[];
+    /** 最终命中的规则 ID。 */
+    selectedRule: string;
+    /** 决策时间。 */
+    timestamp: string;
+  };
+}
+
+/** 能力令牌定义。 */
+export interface CapabilityToken {
+  /** 令牌 ID。 */
+  tokenId: string;
+  /** 令牌作用域。 */
+  scope: string[];
+  /** 令牌 TTL（秒）。 */
+  ttlSeconds: number;
+  /** 签发时间。 */
+  issuedAt: number;
+}
+
+/** 授权计划定义。 */
+export interface AuthorityPlan {
+  /** 是否需要审批。 */
+  approvalsRequired: boolean;
+  /** 本次执行所需能力。 */
+  requiredCapabilities: string[];
+  /** 签发的能力令牌。 */
+  capabilityTokens: CapabilityToken[];
+}
+
+/** 任务状态。 */
+export type TaskStatus =
+  | 'queued'
+  | 'running'
+  | 'blocked'
+  | 'retrying'
+  | 'completed'
+  | 'canceled'
+  | 'failed';
+
+/** 任务账本记录。 */
+export interface TaskLedgerRecord {
+  /** 任务 ID。 */
+  taskId: string;
+  /** 会话 ID。 */
+  sessionId: string;
+  /** 运行时。 */
+  runtime: RuntimeTarget;
+  /** 任务角色。 */
+  role: string;
+  /** 任务目标。 */
+  objective: string;
+  /** 当前状态。 */
+  status: TaskStatus;
+  /** 上游依赖。 */
+  dependsOn: string[];
+  /** 创建时间。 */
+  createdAt: number;
+  /** 更新时间。 */
+  updatedAt: number;
+  /** 失败原因（可选）。 */
+  error?: string;
+}
+
+/** Outcome 回写记录。 */
+export interface OutcomeRecord {
+  /** 会话 ID。 */
+  sessionId: string;
+  /** 决策策略。 */
+  selectedStrategy: string;
+  /** 质量分。 */
+  qualityScore: number;
+  /** 总成本。 */
+  totalCostUsd: number;
+  /** 总耗时。 */
+  totalLatencyMs: number;
+  /** 执行是否成功。 */
+  success: boolean;
+  /** 时间戳。 */
+  createdAt: number;
 }
 
 // ─── BudgetConfig - 预算配置 ──────────────────────────
@@ -389,6 +677,15 @@ export interface AgentConfig {
   llm: LLMAdapter;
   /** 预算配置 */
   budget?: BudgetConfig;
+  /** 可选：OpenHarness 风格路由策略配置 */
+  routingPolicy?: RoutingPolicy;
+  /** 可选：能力签发参数 */
+  authorityConfig?: {
+    /** 默认令牌 TTL（秒）。 */
+    defaultTokenTtlSeconds?: number;
+    /** 触发 ask 模式审批的能力名单。 */
+    approvalSensitiveCapabilities?: string[];
+  };
 }
 
 // ─── Event 类型 ─────────────────────────────────────
