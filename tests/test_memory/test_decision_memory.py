@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.memory.types import DecisionRecord
 
@@ -108,6 +110,28 @@ def test_recall_similar(tmp_path: Path):
     assert "dec-2" in result_ids
 
 
+def test_recall_similar_handles_chinese_punctuation(tmp_path: Path):
+    """中文查询即使没有空格分词，也应能通过标点清洗召回相似历史。"""
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    mem.save(
+        _make_record(
+            decision_id="dec-cn-1",
+            user_id="u1",
+            scenario="career",
+            query="两个 offer 怎么选，短期薪资和长期成长怎么平衡？",
+        )
+    )
+
+    results = mem.recall_similar(
+        "u1",
+        "career",
+        "现在有两个 offer，一个钱多一个成长更好，我该怎么选？",
+    )
+
+    assert len(results) == 1
+    assert results[0].decision_id == "dec-cn-1"
+
+
 def test_recall_similar_other_user_excluded(tmp_path: Path):
     """召回不返回其他用户的决策。"""
     mem = DecisionMemory(base_dir=tmp_path / "decisions")
@@ -193,7 +217,3 @@ def test_generate_id():
     assert id1.startswith("dec-")
     assert len(id1) == 16  # "dec-" + 12 hex chars
     assert id1 != id2
-
-
-# 需要 pytest import
-import pytest

@@ -229,7 +229,7 @@ class OpenHarnessTerminalApp(App[None]):
             with Vertical(id="transcript-column"):
                 yield RichLog(id="transcript", wrap=True, highlight=True, markup=True)
                 yield Static("Ready.", id="current-response")
-                yield Input(placeholder="Ask OpenHarness or enter a /command", id="composer")
+                yield Input(placeholder="Ask Velaris or enter a /command", id="composer")
             with Vertical(id="side-column"):
                 yield Static("Starting...", id="status-bar")
                 yield Static("No tasks yet.", id="tasks-panel")

@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import shutil
 import sys
 import tempfile
 import time
@@ -176,7 +175,7 @@ async def test_hooks_in_agent_loop():
     from openharness.config.settings import PermissionSettings
     from openharness.engine.query import QueryContext, run_query
     from openharness.engine.messages import ConversationMessage
-    from openharness.engine.stream_events import AssistantTextDelta, AssistantTurnComplete, ToolExecutionStarted, ToolExecutionCompleted
+    from openharness.engine.stream_events import AssistantTextDelta, ToolExecutionStarted, ToolExecutionCompleted
     from openharness.permissions.checker import PermissionChecker
     from openharness.permissions.modes import PermissionMode
     from openharness.tools.base import ToolRegistry
@@ -229,7 +228,6 @@ async def test_hooks_in_agent_loop():
 # ====================================================================
 async def test_skills_load():
     """Create skill files, load them, verify registry."""
-    from openharness.skills.types import SkillDefinition
     from openharness.skills.registry import SkillRegistry
     from openharness.skills.loader import load_user_skills
 
@@ -282,7 +280,6 @@ Fetch the PR diff, review for bugs, style issues, and security problems.
 async def test_plugins_load():
     """Create a plugin directory, load it, verify manifest and skills."""
     from openharness.plugins.loader import load_plugin
-    from openharness.plugins.schemas import PluginManifest
 
     with tempfile.TemporaryDirectory() as tmpdir:
         plugin_dir = Path(tmpdir) / "my-plugin"
@@ -429,9 +426,9 @@ async def test_session_storage():
 # ====================================================================
 async def test_config_settings():
     """Test settings loading, env var overrides, and path functions."""
-    from openharness.config.settings import Settings, load_settings, PermissionSettings
+    from openharness.config.settings import Settings, load_settings
     from openharness.config.paths import (
-        get_config_dir, get_sessions_dir, get_tasks_dir, get_logs_dir,
+        get_config_dir, get_sessions_dir, get_tasks_dir,
     )
 
     # Default settings
@@ -642,7 +639,7 @@ async def test_combined_hooks_skills_agent():
     from openharness.config.settings import PermissionSettings
     from openharness.engine.query import QueryContext, run_query
     from openharness.engine.messages import ConversationMessage
-    from openharness.engine.stream_events import AssistantTextDelta, AssistantTurnComplete, ToolExecutionStarted
+    from openharness.engine.stream_events import AssistantTextDelta, ToolExecutionStarted
     from openharness.permissions.checker import PermissionChecker
     from openharness.permissions.modes import PermissionMode
     from openharness.tools.base import ToolRegistry
@@ -715,7 +712,6 @@ async def test_full_swarm_autoagent():
     from openharness.tools.glob_tool import GlobTool
     from openharness.tools.grep_tool import GrepTool
     from openharness.swarm.team_lifecycle import TeamLifecycleManager, TeamMember
-    from openharness.swarm.mailbox import TeammateMailbox, create_user_message
     import openharness.swarm.mailbox as mb
     import openharness.swarm.team_lifecycle as tl
 

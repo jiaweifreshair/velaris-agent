@@ -18,7 +18,9 @@ class DecisionRecord(BaseModel):
 
     decision_id: str = Field(description="决策唯一 ID")
     user_id: str = Field(description="用户 ID")
-    scenario: str = Field(description="场景: travel/tokencost/openclaw")
+    scenario: str = Field(
+        description="决策场景或领域, 如 travel / tokencost / robotclaw / career"
+    )
 
     # 输入
     query: str = Field(description="原始意图文本")

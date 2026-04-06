@@ -66,3 +66,66 @@ async def test_biz_execute_tool_runs_full_tokencost_flow(tmp_path: Path):
     assert payload["result"]["projected_monthly_cost"] == 1000
     assert payload["task"]["status"] == "completed"
     assert payload["outcome"]["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_biz_execute_tool_runs_full_lifegoal_flow(tmp_path: Path):
+    registry = create_default_tool_registry()
+    orchestrator = VelarisBizOrchestrator()
+    context = ToolExecutionContext(
+        cwd=tmp_path,
+        metadata={
+            "tool_registry": registry,
+            "velaris_orchestrator": orchestrator,
+        },
+    )
+
+    biz_execute = registry.get("biz_execute")
+    assert biz_execute is not None
+
+    result = await biz_execute.execute(
+        biz_execute.input_model(
+            query="我收到了两个 offer，一个薪资更高，一个成长更强，帮我做人生目标决策",
+            payload={
+                "domain": "career",
+                "risk_tolerance": "moderate",
+                "constraints": ["一年内希望带团队", "不希望长期 996"],
+                "options": [
+                    {
+                        "id": "offer-a",
+                        "label": "Offer A：高薪成熟岗",
+                        "dimensions": {
+                            "growth": 0.56,
+                            "income": 0.93,
+                            "fulfillment": 0.61,
+                            "stability": 0.82,
+                            "balance": 0.38,
+                        },
+                    },
+                    {
+                        "id": "offer-b",
+                        "label": "Offer B：成长型核心岗",
+                        "dimensions": {
+                            "growth": 0.95,
+                            "income": 0.71,
+                            "fulfillment": 0.9,
+                            "stability": 0.68,
+                            "balance": 0.79,
+                        },
+                    },
+                ],
+            },
+            session_id="session-lifegoal",
+        ),
+        context,
+    )
+
+    payload = json.loads(result.output)
+    assert result.is_error is False
+    assert payload["plan"]["scenario"] == "lifegoal"
+    assert payload["routing"]["selected_strategy"] == "local_closed_loop"
+    assert payload["routing"]["stop_profile"] == "balanced"
+    assert payload["result"]["domain"] == "career"
+    assert payload["result"]["recommended"]["id"] == "offer-b"
+    assert payload["task"]["status"] == "completed"
+    assert payload["outcome"]["success"] is True

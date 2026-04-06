@@ -9,7 +9,6 @@ Run: python tests/test_real_large_tasks.py
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import tempfile
@@ -94,9 +93,6 @@ async def task_security_audit_with_hooks():
     from openharness.hooks.schemas import CommandHookDefinition
     from openharness.hooks.executor import HookExecutor, HookExecutionContext
     from openharness.api.client import AnthropicApiClient
-    from openharness.config.settings import PermissionSettings
-    from openharness.permissions.checker import PermissionChecker
-    from openharness.permissions.modes import PermissionMode
 
     api = AnthropicApiClient(api_key=API_KEY, base_url=BASE_URL)
 
@@ -174,7 +170,6 @@ async def task_coordinator_code_review():
     from openharness.swarm.in_process import start_in_process_teammate, TeammateAbortController
     from openharness.swarm.types import TeammateSpawnConfig
     from openharness.swarm.team_lifecycle import TeamLifecycleManager, TeamMember
-    from openharness.swarm.mailbox import TeammateMailbox, create_idle_notification
     from openharness.engine.query import QueryContext
     from openharness.api.client import AnthropicApiClient
     from openharness.config.settings import PermissionSettings
@@ -302,7 +297,6 @@ async def task_migration_plan_with_memory():
     from openharness.skills.types import SkillDefinition
     from openharness.memory.manager import add_memory_entry, list_memory_files, remove_memory_entry
     from openharness.services.session_storage import save_session_snapshot, export_session_markdown
-    from openharness.api.usage import UsageSnapshot
     import openharness.memory.paths as mp
     import openharness.memory.manager as mm
 
@@ -666,7 +660,7 @@ async def task_refactor_with_session():
     """Refactor code across 3 turns, save session, verify it can be loaded."""
 
     from openharness.services.session_storage import (
-        save_session_snapshot, load_session_snapshot, list_session_snapshots,
+        save_session_snapshot, load_session_snapshot,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:

@@ -14,7 +14,7 @@ from openharness.tools.base import BaseTool, ToolExecutionContext, ToolResult
 class BizRunScenarioToolInput(BaseModel):
     """业务场景执行工具入参。"""
 
-    scenario: str = Field(description="业务场景：travel / tokencost / openclaw")
+    scenario: str = Field(description="业务场景：travel / tokencost / robotclaw / lifegoal")
     payload: dict[str, Any] = Field(default_factory=dict, description="业务负载")
 
 

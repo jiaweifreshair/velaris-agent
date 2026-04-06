@@ -10,12 +10,16 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from velaris_agent.memory.types import DecisionRecord
+
+
+_QUERY_TOKEN_SPLIT_RE = re.compile(r"[^\w\u4e00-\u9fff]+", re.UNICODE)
 
 
 def _now() -> datetime:
@@ -134,10 +138,12 @@ class DecisionMemory:
     ) -> list[DecisionRecord]:
         """找到相似的历史决策。
 
-        当前实现: 关键词匹配 (简单但有效)。
+        当前实现: 轻量关键词匹配。
+        相比简单的 `split()`，这里会先清洗中英文标点，
+        让中文问题在没有空格分词时也能得到基本可用的召回效果。
         未来可升级为 embedding 语义搜索。
         """
-        query_words = set(query.lower().split())
+        query_words = self._tokenize_query(query)
         candidates: list[tuple[int, DecisionRecord]] = []
 
         for entry in self._scan_index_reversed():
@@ -146,7 +152,7 @@ class DecisionMemory:
             if entry.get("scenario") != scenario:
                 continue
             # 简单关键词匹配评分
-            entry_words = set(entry.get("query", "").lower().split())
+            entry_words = self._tokenize_query(str(entry.get("query", "")))
             overlap = len(query_words & entry_words)
             if overlap > 0:
                 record = self.get(entry["decision_id"])
@@ -156,6 +162,19 @@ class DecisionMemory:
         # 按匹配度排序
         candidates.sort(key=lambda x: x[0], reverse=True)
         return [r for _, r in candidates[:limit]]
+
+    def _tokenize_query(self, query: str) -> set[str]:
+        """把查询文本切成可比较的关键词集合。
+
+        这里不追求复杂分词，只做两件事：
+        1. 清洗掉中英文标点和噪音符号；
+        2. 保留英文单词与中文短语块。
+
+        这样做的原因是当前仓库以中文使用场景为主，
+        仅用空格分词会导致大量中文查询无法召回。
+        """
+        normalized = _QUERY_TOKEN_SPLIT_RE.sub(" ", query.lower())
+        return {token for token in normalized.split() if token}
 
     def aggregate_outcomes(
         self,

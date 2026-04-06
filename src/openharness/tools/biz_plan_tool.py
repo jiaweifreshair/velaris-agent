@@ -23,7 +23,7 @@ class BizPlanTool(BaseTool):
     """输出 Velaris 业务能力计划。"""
 
     name = "biz_plan"
-    description = "Build a Velaris business capability plan for travel, tokencost, or openclaw scenarios."
+    description = "Build a Velaris business capability plan for lifegoal, travel, tokencost, or robotclaw scenarios."
     input_model = BizPlanToolInput
 
     def is_read_only(self, arguments: BizPlanToolInput) -> bool:

@@ -15,7 +15,9 @@ class SaveDecisionInput(BaseModel):
     """保存决策工具入参。"""
 
     user_id: str = Field(description="用户 ID")
-    scenario: str = Field(description="业务场景, 如 travel / tokencost / openclaw")
+    scenario: str = Field(
+        description="业务场景或人生领域, 如 travel / tokencost / robotclaw / career"
+    )
     query: str = Field(description="用户原始查询文本")
     recommended: dict[str, Any] = Field(description="系统推荐的选项, 至少包含 id 和 label")
     alternatives: list[dict[str, Any]] = Field(

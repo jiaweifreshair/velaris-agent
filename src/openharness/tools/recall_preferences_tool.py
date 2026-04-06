@@ -14,7 +14,9 @@ class RecallPreferencesInput(BaseModel):
     """召回偏好工具入参。"""
 
     user_id: str = Field(description="用户 ID")
-    scenario: str = Field(description="业务场景, 如 travel / tokencost / openclaw")
+    scenario: str = Field(
+        description="业务场景或人生领域, 如 travel / tokencost / robotclaw / career"
+    )
 
 
 class RecallPreferencesTool(BaseTool):

@@ -12,7 +12,6 @@ from velaris_agent.scenarios.robotclaw.protocol.intent_order import (
     Budget,
     IntentOrder,
     Location,
-    ServicePreferences,
     TimeRequirements,
     TripConstraints,
 )

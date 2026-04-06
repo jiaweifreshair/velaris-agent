@@ -14,7 +14,9 @@ class RecallDecisionsInput(BaseModel):
     """召回历史决策工具入参。"""
 
     user_id: str = Field(description="用户 ID")
-    scenario: str = Field(description="业务场景, 如 travel / tokencost / openclaw")
+    scenario: str = Field(
+        description="业务场景或人生领域, 如 travel / tokencost / robotclaw / career"
+    )
     query: str = Field(description="当前查询文本, 用于相似度匹配")
     limit: int = Field(default=5, ge=1, le=20, description="返回结果数量上限")
 

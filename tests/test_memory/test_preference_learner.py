@@ -65,6 +65,17 @@ def test_no_history_unknown_scenario(tmp_path: Path):
     assert set(prefs.weights.keys()) == {"quality", "cost", "speed"}
 
 
+def test_no_history_career_domain_returns_lifegoal_defaults(tmp_path: Path):
+    """人生目标领域在无历史时应返回领域默认权重。"""
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    learner = PreferenceLearner(mem)
+
+    prefs = learner.compute_preferences("career-user", "career")
+    assert prefs.total_decisions == 0
+    assert prefs.confidence == 0.0
+    assert prefs.weights == DEFAULT_WEIGHTS["career"]
+
+
 def test_learns_from_choices(tmp_path: Path):
     """用户总选 opt-b (comfort 更好) 而非推荐的 opt-a (price 更好) -> comfort 权重增大。"""
     mem = DecisionMemory(base_dir=tmp_path / "decisions")

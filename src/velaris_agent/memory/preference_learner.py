@@ -15,12 +15,20 @@ from typing import Any
 
 from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.memory.types import DecisionRecord, UserPreferences
+from velaris_agent.scenarios.lifegoal.types import DOMAIN_DIMENSIONS
 
 # 场景默认权重 (先验)
 DEFAULT_WEIGHTS: dict[str, dict[str, float]] = {
     "travel": {"price": 0.40, "time": 0.35, "comfort": 0.25},
     "tokencost": {"cost": 0.50, "quality": 0.35, "speed": 0.15},
     "robotclaw": {"safety": 0.40, "eta": 0.25, "cost": 0.20, "compliance": 0.15},
+    **{domain: dict(weights) for domain, weights in DOMAIN_DIMENSIONS.items()},
+}
+
+FALLBACK_WEIGHTS: dict[str, float] = {"quality": 0.5, "cost": 0.3, "speed": 0.2}
+
+SCENARIO_ALIASES: dict[str, str] = {
+    "openclaw": "robotclaw",
 }
 
 # 时间衰减半衰期 (天)
@@ -44,20 +52,21 @@ class PreferenceLearner:
         self, user_id: str, scenario: str
     ) -> UserPreferences:
         """计算用户在该场景下的完整偏好画像。"""
-        records = self._memory.list_by_user(user_id, scenario=scenario, limit=100)
+        normalized_scenario = self._normalize_scenario(scenario)
+        records = self._memory.list_by_user(user_id, scenario=normalized_scenario, limit=100)
 
         if not records:
-            default_w = DEFAULT_WEIGHTS.get(scenario, {"quality": 0.5, "cost": 0.3, "speed": 0.2})
+            default_w = self._default_weights(normalized_scenario)
             return UserPreferences(
                 user_id=user_id,
-                scenario=scenario,
+                scenario=normalized_scenario,
                 weights=dict(default_w),
                 total_decisions=0,
                 confidence=0.0,
             )
 
         # 计算个性化权重
-        weights = self._learn_weights(records, scenario)
+        weights = self._learn_weights(records, normalized_scenario)
 
         # 计算行为指标
         total = len(records)
@@ -76,7 +85,7 @@ class PreferenceLearner:
 
         return UserPreferences(
             user_id=user_id,
-            scenario=scenario,
+            scenario=normalized_scenario,
             weights=weights,
             total_decisions=total,
             accepted_recommendation_rate=accepted / total if total > 0 else 0,
@@ -106,9 +115,7 @@ class PreferenceLearner:
         3. 用指数衰减加权 (近期决策影响更大)
         4. 与默认权重混合 (贝叶斯先验)
         """
-        prior = dict(DEFAULT_WEIGHTS.get(
-            scenario, {"quality": 0.5, "cost": 0.3, "speed": 0.2}
-        ))
+        prior = self._default_weights(scenario)
         dims = list(prior.keys())
 
         # 收集权重调整信号
@@ -203,7 +210,7 @@ class PreferenceLearner:
         if not choices_with_feedback:
             return patterns
 
-        dims = list(DEFAULT_WEIGHTS.get(scenario, {}).keys())
+        dims = list(self._default_weights(scenario).keys())
 
         # 分析: 用户总是选某维度最优的选项吗?
         for dim in dims:
@@ -231,3 +238,21 @@ class PreferenceLearner:
             patterns.append(f"经常选择非推荐项 ({accept_rate:.0%})")
 
         return patterns
+
+    def _default_weights(self, scenario: str) -> dict[str, float]:
+        """解析场景默认权重。
+
+        既支持标准业务场景, 也支持人生目标的六个领域,
+        同时兼容历史别名写法, 避免 README、技能文档和运行时场景名不一致时失效。
+        """
+        normalized_scenario = self._normalize_scenario(scenario)
+        return dict(DEFAULT_WEIGHTS.get(normalized_scenario, FALLBACK_WEIGHTS))
+
+    def _normalize_scenario(self, scenario: str) -> str:
+        """归一化场景名。
+
+        这样历史兼容名和当前标准名会聚合到同一个偏好画像下,
+        避免记忆被拆散。
+        """
+        lowered = scenario.strip().lower()
+        return SCENARIO_ALIASES.get(lowered, lowered)
