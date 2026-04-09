@@ -14,3 +14,5 @@ class SkillDefinition:
     content: str
     source: str
     path: str | None = None
+    slug: str | None = None
+    skill_dir: str | None = None

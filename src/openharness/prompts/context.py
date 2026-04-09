@@ -9,26 +9,7 @@ from openharness.config.settings import Settings
 from openharness.memory import find_relevant_memories, load_memory_prompt
 from openharness.prompts.claudemd import load_claude_md_prompt
 from openharness.prompts.system_prompt import build_system_prompt
-from openharness.skills.loader import load_skill_registry
-
-
-def _build_skills_section(cwd: str | Path) -> str | None:
-    """Build a system prompt section listing available skills."""
-    registry = load_skill_registry(cwd)
-    skills = registry.list_skills()
-    if not skills:
-        return None
-    lines = [
-        "# Available Skills",
-        "",
-        "The following skills are available via the `skill` tool. "
-        "When a user's request matches a skill, invoke it with `skill(name=\"<skill_name>\")` "
-        "to load detailed instructions before proceeding.",
-        "",
-    ]
-    for skill in skills:
-        lines.append(f"- **{skill.name}**: {skill.description}")
-    return "\n".join(lines)
+from openharness.skills.prompt_index import build_skills_system_prompt
 
 
 def build_runtime_system_prompt(
@@ -52,7 +33,12 @@ def build_runtime_system_prompt(
         "Adjust depth and iteration count to match these settings while still completing the task."
     )
 
-    skills_section = _build_skills_section(cwd)
+    skills_section = None
+    if settings.skills.enabled:
+        skills_section = build_skills_system_prompt(
+            cwd,
+            max_entries=settings.skills.max_index_entries,
+        )
     if skills_section:
         sections.append(skills_section)
 

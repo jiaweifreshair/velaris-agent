@@ -40,6 +40,7 @@ from openharness.tools.remote_trigger_tool import RemoteTriggerTool
 from openharness.tools.save_decision_tool import SaveDecisionTool
 from openharness.tools.send_message_tool import SendMessageTool
 from openharness.tools.self_evolution_review_tool import SelfEvolutionReviewTool
+from openharness.tools.skill_manage_tool import SkillManageTool
 from openharness.tools.skill_tool import SkillTool
 from openharness.tools.sleep_tool import SleepTool
 from openharness.tools.task_create_tool import TaskCreateTool
@@ -89,6 +90,7 @@ def create_default_tool_registry(mcp_manager=None) -> ToolRegistry:
         GlobTool(),
         GrepTool(),
         SkillTool(),
+        SkillManageTool(),
         ToolSearchTool(),
         WebFetchTool(),
         WebSearchTool(),

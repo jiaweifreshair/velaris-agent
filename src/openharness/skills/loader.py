@@ -7,6 +7,7 @@ from pathlib import Path
 from openharness.config.paths import get_config_dir
 from openharness.config.settings import load_settings
 from openharness.skills.bundled import get_bundled_skills
+from openharness.skills.helpers import build_skill_definition
 from openharness.skills.registry import SkillRegistry
 from openharness.skills.types import SkillDefinition
 
@@ -38,59 +39,32 @@ def load_skill_registry(cwd: str | Path | None = None) -> SkillRegistry:
 
 
 def load_user_skills() -> list[SkillDefinition]:
-    """Load markdown skills from the user config directory."""
+    """加载用户技能。
+
+    兼容两种格式：
+    1. 旧版平铺文件：`skills/foo.md`
+    2. Hermes 风格目录：`skills/foo/SKILL.md`
+    """
+
     skills: list[SkillDefinition] = []
-    for path in sorted(get_user_skills_dir().glob("*.md")):
+    skills_dir = get_user_skills_dir()
+
+    for path in _iter_user_skill_files(skills_dir):
         content = path.read_text(encoding="utf-8")
-        name, description = _parse_skill_markdown(path.stem, content)
-        skills.append(
-            SkillDefinition(
-                name=name,
-                description=description,
-                content=content,
-                source="user",
-                path=str(path),
-            )
-        )
+        skills.append(build_skill_definition(path=path, content=content, source="user"))
+
     return skills
 
 
-def _parse_skill_markdown(default_name: str, content: str) -> tuple[str, str]:
-    """Parse name and description from a skill markdown file with YAML frontmatter support."""
-    name = default_name
-    description = ""
+def _iter_user_skill_files(skills_dir: Path) -> list[Path]:
+    """返回用户技能文件列表，并避免重复扫描。"""
 
-    lines = content.splitlines()
+    discovered: dict[Path, None] = {}
 
-    # Try YAML frontmatter first (--- ... ---)
-    if lines and lines[0].strip() == "---":
-        for i, line in enumerate(lines[1:], 1):
-            if line.strip() == "---":
-                # Parse frontmatter fields
-                for fm_line in lines[1:i]:
-                    fm_stripped = fm_line.strip()
-                    if fm_stripped.startswith("name:"):
-                        val = fm_stripped[5:].strip().strip("'\"")
-                        if val:
-                            name = val
-                    elif fm_stripped.startswith("description:"):
-                        val = fm_stripped[12:].strip().strip("'\"")
-                        if val:
-                            description = val
-                break
+    for path in sorted(skills_dir.glob("*.md")):
+        discovered[path.resolve()] = None
 
-    # Fallback: extract from headings and first paragraph
-    if not description:
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("# "):
-                if not name or name == default_name:
-                    name = stripped[2:].strip() or default_name
-                continue
-            if stripped and not stripped.startswith("---") and not stripped.startswith("#"):
-                description = stripped[:200]
-                break
+    for path in sorted(skills_dir.rglob("SKILL.md")):
+        discovered[path.resolve()] = None
 
-    if not description:
-        description = f"Skill: {name}"
-    return name, description
+    return sorted(discovered.keys())

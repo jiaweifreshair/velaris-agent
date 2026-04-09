@@ -263,6 +263,13 @@ uv run python scripts/run_lifegoal_demo.py
 | `tokencost_analyze` | AI 成本分析与优化 |
 | `robotclaw_dispatch` | RobotClaw 三段式调度 |
 
+### Skill 类
+
+| 工具 | 说明 |
+|------|------|
+| `skill` | 按需读取技能全文或支持文件 |
+| `skill_manage` | 创建 / patch / 编辑 / 删除技能与支持文件 |
+
 ---
 
 ## Decision Memory
@@ -357,6 +364,35 @@ Velaris Agent 的决策过程:
 | **Swarm** | 多 agent 协调, subprocess/in-process 后端 |
 | **Tasks** | 后台任务管理, shell/agent 任务 |
 | **MCP** | Model Context Protocol 工具集成 |
+
+---
+
+## Skill System
+
+Velaris 现在采用 Hermes 风格的技能沉淀架构，而不是“做完立刻硬编码保存”：
+
+1. 前台引导：系统提示会注入 `SKILLS_GUIDANCE`，提醒模型在复杂任务（如 5+ 次工具调用、棘手错误修复、非平凡工作流）后考虑沉淀技能。
+2. 索引层加载：系统提示只注入技能索引（名称 + 描述），避免把完整技能内容塞进前缀。
+3. 按需层加载：当用户输入 `/skill-name`，或模型显式调用 `skill(name="...")` 时，完整技能内容才会作为用户消息注入。
+4. 后台 Review：主任务完成后，如果工具调用次数达到阈值，Engine 会 fork 一个静默 review 回合，只暴露 `skill` + `skill_manage`，best-effort 地创建或修补技能。
+
+### 用户技能目录
+
+```bash
+~/.velaris-agent/skills/
+```
+
+支持两种格式：
+
+- 旧格式：`~/.velaris-agent/skills/my-skill.md`
+- 新格式：`~/.velaris-agent/skills/my-skill/SKILL.md`
+
+新格式还支持：
+
+- `references/`
+- `templates/`
+- `scripts/`
+- `assets/`
 
 ---
 

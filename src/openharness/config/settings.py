@@ -46,6 +46,18 @@ class MemorySettings(BaseModel):
     max_entrypoint_lines: int = 200
 
 
+class SkillsSettings(BaseModel):
+    """Skills 系统配置。
+
+    该配置控制技能索引注入与后台 review 的触发频率，
+    用于把技能沉淀从“单次行为”变成稳定运行机制。
+    """
+
+    enabled: bool = True
+    creation_nudge_interval: int = 10
+    max_index_entries: int = 200
+
+
 class Settings(BaseModel):
     """Main settings model for OpenHarness."""
 
@@ -60,6 +72,7 @@ class Settings(BaseModel):
     permission: PermissionSettings = Field(default_factory=PermissionSettings)
     hooks: dict[str, list[HookDefinition]] = Field(default_factory=dict)
     memory: MemorySettings = Field(default_factory=MemorySettings)
+    skills: SkillsSettings = Field(default_factory=SkillsSettings)
     enabled_plugins: dict[str, bool] = Field(default_factory=dict)
     mcp_servers: dict[str, McpServerConfig] = Field(default_factory=dict)
 

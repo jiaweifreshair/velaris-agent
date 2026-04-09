@@ -26,6 +26,21 @@
 
 ## 已实现能力
 
+### Skill 沉淀
+
+- 新增 `skill_manage`：
+  - 支持 `create/edit/patch/delete/write_file/remove_file`；
+  - 技能默认落到 `~/.velaris-agent/skills/<slug>/SKILL.md`。
+- 增强 `skill`：
+  - 支持读取主技能；
+  - 支持读取 `references/templates/scripts/assets` 下的支持文件。
+- 新增 skills 索引提示：
+  - 系统提示只注入“技能名 + 描述 + SKILLS_GUIDANCE”；
+  - 完整技能内容通过 `skill(...)` 或 `/skill-name` 动态注入。
+- 新增后台 review：
+  - `QueryEngine` 按工具调用阈值触发静默技能复盘；
+  - review 仅开放 `skill` 与 `skill_manage`，不阻塞主任务。
+
 ### 自进化
 
 - 新增 `SelfEvolutionEngine`：

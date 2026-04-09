@@ -8,7 +8,7 @@ from pathlib import Path
 from openharness.config.paths import get_config_dir, get_project_config_dir
 from openharness.plugins.schemas import PluginManifest
 from openharness.plugins.types import LoadedPlugin
-from openharness.skills.loader import _parse_skill_markdown
+from openharness.skills.helpers import build_skill_definition
 from openharness.skills.types import SkillDefinition
 
 
@@ -112,16 +112,7 @@ def _load_plugin_skills(path: Path) -> list[SkillDefinition]:
     skills: list[SkillDefinition] = []
     for skill_path in sorted(path.glob("*.md")):
         content = skill_path.read_text(encoding="utf-8")
-        name, description = _parse_skill_markdown(skill_path.stem, content)
-        skills.append(
-            SkillDefinition(
-                name=name,
-                description=description,
-                content=content,
-                source="plugin",
-                path=str(skill_path),
-            )
-        )
+        skills.append(build_skill_definition(path=skill_path, content=content, source="plugin"))
     return skills
 
 

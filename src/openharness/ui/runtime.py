@@ -22,6 +22,10 @@ from openharness.plugins import load_plugins
 from openharness.prompts import build_runtime_system_prompt
 from openharness.state import AppState, AppStateStore
 from openharness.services.session_storage import save_session_snapshot
+from openharness.skills.commands import (
+    build_skill_invocation_message,
+    resolve_skill_command,
+)
 from openharness.tools import ToolRegistry, create_default_tool_registry
 from openharness.keybindings import load_keybindings
 
@@ -159,6 +163,7 @@ async def build_runtime(
         ask_user_prompt=ask_user_prompt,
         hook_executor=hook_executor,
         tool_metadata={"mcp_manager": mcp_manager, "bridge_manager": bridge_manager},
+        skill_review_interval=settings.skills.creation_nudge_interval,
     )
     from uuid import uuid4
 
@@ -186,6 +191,7 @@ async def start_runtime(bundle: RuntimeBundle) -> None:
 
 async def close_runtime(bundle: RuntimeBundle) -> None:
     """Close runtime-owned resources."""
+    await bundle.engine.wait_for_background_tasks()
     await bundle.mcp_manager.close()
     await bundle.hook_executor.execute(
         HookEvent.SESSION_END,
@@ -253,11 +259,21 @@ async def handle_line(
         sync_app_state(bundle)
         return not result.should_exit
 
+    submitted_line = line
+    if line.startswith("/"):
+        command_name, _, command_args = line.partition(" ")
+        matched_skill = resolve_skill_command(command_name, bundle.cwd)
+        if matched_skill is not None:
+            submitted_line = build_skill_invocation_message(
+                matched_skill,
+                user_instruction=command_args,
+            )
+
     settings = bundle.current_settings()
     bundle.engine.set_system_prompt(
         build_runtime_system_prompt(settings, cwd=bundle.cwd, latest_user_prompt=line)
     )
-    async for event in bundle.engine.submit_message(line):
+    async for event in bundle.engine.submit_message(submitted_line):
         await render_event(event)
     save_session_snapshot(
         cwd=bundle.cwd,
