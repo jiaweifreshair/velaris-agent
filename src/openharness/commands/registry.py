@@ -590,6 +590,10 @@ def create_default_command_registry() -> CommandRegistry:
 
     async def _bridge_handler(args: str, context: CommandContext) -> CommandResult:
         tokens = args.split()
+        tool_metadata = context.engine.get_tool_metadata()
+        security_settings = tool_metadata.get("security_settings")
+        security_session_state = tool_metadata.get("security_session_state")
+        permission_prompt = context.engine.get_permission_prompt()
         if not tokens or tokens[0] == "show":
             sessions = get_bridge_manager().list_sessions()
             lines = [
@@ -612,11 +616,17 @@ def create_default_command_registry() -> CommandRegistry:
             return CommandResult(message=build_sdk_url(tokens[1], tokens[2]))
         if tokens[0] == "spawn" and len(tokens) >= 2:
             command = args[len("spawn ") :]
-            handle = await get_bridge_manager().spawn(
-                session_id=f"bridge-{datetime.now(timezone.utc).strftime('%H%M%S')}",
-                command=command,
-                cwd=context.cwd,
-            )
+            try:
+                handle = await get_bridge_manager().spawn(
+                    session_id=f"bridge-{datetime.now(timezone.utc).strftime('%H%M%S')}",
+                    command=command,
+                    cwd=context.cwd,
+                    security_settings=security_settings,
+                    security_session_state=security_session_state,
+                    permission_prompt=permission_prompt,
+                )
+            except ValueError as exc:
+                return CommandResult(message=str(exc))
             return CommandResult(
                 message=f"Spawned bridge session {handle.session_id} pid={handle.process.pid}"
             )
@@ -631,7 +641,18 @@ def create_default_command_registry() -> CommandRegistry:
                 )
             )
         if tokens[0] == "output" and len(tokens) == 2:
-            return CommandResult(message=get_bridge_manager().read_output(tokens[1]) or "(no output)")
+            redact_secrets = True
+            if hasattr(security_settings, "redact_secrets"):
+                redact_secrets = bool(security_settings.redact_secrets)
+            elif isinstance(security_settings, dict):
+                redact_secrets = bool(security_settings.get("redact_secrets", True))
+            return CommandResult(
+                message=get_bridge_manager().read_output(
+                    tokens[1],
+                    redact_secrets=redact_secrets,
+                )
+                or "(no output)"
+            )
         if tokens[0] == "stop" and len(tokens) == 2:
             try:
                 await get_bridge_manager().stop(tokens[1])
@@ -1202,6 +1223,10 @@ def create_default_command_registry() -> CommandRegistry:
 
     async def _tasks_handler(args: str, context: CommandContext) -> CommandResult:
         manager = get_task_manager()
+        tool_metadata = context.engine.get_tool_metadata()
+        security_settings = tool_metadata.get("security_settings")
+        security_session_state = tool_metadata.get("security_session_state")
+        permission_prompt = context.engine.get_permission_prompt()
         tokens = args.split(maxsplit=2)
         if not tokens or tokens[0] == "list":
             tasks = manager.list_tasks()
@@ -1212,11 +1237,17 @@ def create_default_command_registry() -> CommandRegistry:
             )
         if tokens[0] == "run" and len(tokens) >= 2:
             command = args[len("run ") :]
-            task = await manager.create_shell_task(
-                command=command,
-                description=command[:80],
-                cwd=context.cwd,
-            )
+            try:
+                task = await manager.create_shell_task(
+                    command=command,
+                    description=command[:80],
+                    cwd=context.cwd,
+                    security_settings=security_settings,
+                    security_session_state=security_session_state,
+                    permission_prompt=permission_prompt,
+                )
+            except ValueError as exc:
+                return CommandResult(message=str(exc))
             return CommandResult(message=f"Started task {task.id}")
         if tokens[0] == "stop" and len(tokens) == 2:
             task = await manager.stop_task(tokens[1])

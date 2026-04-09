@@ -12,6 +12,16 @@ from pathlib import Path
 from uuid import uuid4
 
 from openharness.config.paths import get_tasks_dir
+from openharness.config.settings import SecuritySettings
+from openharness.security import (
+    SecuritySessionState,
+    enforce_command_guard,
+    redact_sensitive_text,
+    resolve_security_session_state,
+    resolve_security_settings,
+    validate_process_workdir,
+)
+from openharness.security.execution import SecurityPermissionPrompt
 from openharness.tasks.types import TaskRecord, TaskStatus, TaskType
 
 
@@ -25,6 +35,8 @@ class BackgroundTaskManager:
         self._output_locks: dict[str, asyncio.Lock] = {}
         self._input_locks: dict[str, asyncio.Lock] = {}
         self._generations: dict[str, int] = {}
+        self._task_env: dict[str, dict[str, str]] = {}
+        self._task_security_settings: dict[str, SecuritySettings] = {}
 
     async def create_shell_task(
         self,
@@ -33,8 +45,28 @@ class BackgroundTaskManager:
         description: str,
         cwd: str | Path,
         task_type: TaskType = "local_bash",
+        security_settings: SecuritySettings | dict[str, object] | None = None,
+        security_session_state: SecuritySessionState | None = None,
+        permission_prompt: SecurityPermissionPrompt | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> TaskRecord:
-        """Start a background shell command."""
+        """启动后台 shell 任务，并在创建前执行统一安全校验。"""
+
+        resolved_settings = resolve_security_settings(security_settings)
+        resolved_session_state = resolve_security_session_state(security_session_state)
+        workdir_error = validate_process_workdir(cwd)
+        if workdir_error is not None:
+            raise ValueError(workdir_error)
+        guard_error = await enforce_command_guard(
+            command,
+            tool_name="task_create",
+            security_settings=resolved_settings,
+            session_state=resolved_session_state,
+            permission_prompt=permission_prompt,
+        )
+        if guard_error is not None:
+            raise ValueError(guard_error)
+
         task_id = _task_id(task_type)
         output_path = get_tasks_dir() / f"{task_id}.log"
         record = TaskRecord(
@@ -42,7 +74,7 @@ class BackgroundTaskManager:
             type=task_type,
             status="running",
             description=description,
-            cwd=str(Path(cwd).resolve()),
+            cwd=str(Path(cwd).expanduser().resolve()),
             output_file=output_path,
             command=command,
             created_at=time.time(),
@@ -52,6 +84,8 @@ class BackgroundTaskManager:
         self._tasks[task_id] = record
         self._output_locks[task_id] = asyncio.Lock()
         self._input_locks[task_id] = asyncio.Lock()
+        self._task_env[task_id] = dict(extra_env or {})
+        self._task_security_settings[task_id] = resolved_settings
         await self._start_process(task_id)
         return record
 
@@ -65,24 +99,34 @@ class BackgroundTaskManager:
         model: str | None = None,
         api_key: str | None = None,
         command: str | None = None,
+        security_settings: SecuritySettings | dict[str, object] | None = None,
+        security_session_state: SecuritySessionState | None = None,
+        permission_prompt: SecurityPermissionPrompt | None = None,
     ) -> TaskRecord:
-        """Start a local agent task as a subprocess."""
+        """启动本地 agent 任务，并避免把密钥暴露在子进程参数中。"""
+
+        extra_env: dict[str, str] | None = None
         if command is None:
             effective_api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
             if not effective_api_key:
                 raise ValueError(
                     "Local agent tasks require ANTHROPIC_API_KEY or an explicit command override"
                 )
-            cmd = [sys.executable, "-m", "velaris_agent", "--headless", "--api-key", effective_api_key]
+            cmd = [sys.executable, "-m", "velaris_agent", "--headless"]
             if model:
                 cmd.extend(["--model", model])
             command = " ".join(shlex.quote(part) for part in cmd)
+            extra_env = {"ANTHROPIC_API_KEY": effective_api_key}
 
         record = await self.create_shell_task(
             command=command,
             description=description,
             cwd=cwd,
             task_type=task_type,
+            security_settings=security_settings,
+            security_session_state=security_session_state,
+            permission_prompt=permission_prompt,
+            extra_env=extra_env,
         )
         updated = replace(record, prompt=prompt)
         if task_type != "local_agent":
@@ -149,6 +193,8 @@ class BackgroundTaskManager:
         task = self._require_task(task_id)
         async with self._input_locks[task_id]:
             process = await self._ensure_writable_process(task)
+            if process.stdin is None:
+                raise ValueError(f"Task {task_id} does not accept input")
             process.stdin.write((data.rstrip("\n") + "\n").encode("utf-8"))
             try:
                 await process.stdin.drain()
@@ -156,16 +202,27 @@ class BackgroundTaskManager:
                 if task.type not in {"local_agent", "remote_agent", "in_process_teammate"}:
                     raise ValueError(f"Task {task_id} does not accept input") from None
                 process = await self._restart_agent_task(task)
+                if process.stdin is None:
+                    raise ValueError(f"Task {task_id} does not accept input")
                 process.stdin.write((data.rstrip("\n") + "\n").encode("utf-8"))
                 await process.stdin.drain()
 
-    def read_task_output(self, task_id: str, *, max_bytes: int = 12000) -> str:
-        """Return the tail of a task's output file."""
+    def read_task_output(
+        self,
+        task_id: str,
+        *,
+        max_bytes: int = 12000,
+        redact_secrets: bool | None = None,
+    ) -> str:
+        """返回任务输出尾部，并按任务安全配置做脱敏。"""
+
         task = self._require_task(task_id)
         content = task.output_file.read_text(encoding="utf-8", errors="replace")
         if len(content) > max_bytes:
-            return content[-max_bytes:]
-        return content
+            content = content[-max_bytes:]
+        if redact_secrets is None:
+            redact_secrets = self._task_security_settings.get(task_id, SecuritySettings()).redact_secrets
+        return redact_sensitive_text(content, enabled=redact_secrets)
 
     async def _watch_process(
         self,
@@ -192,13 +249,19 @@ class BackgroundTaskManager:
     async def _copy_output(self, task_id: str, process: asyncio.subprocess.Process) -> None:
         if process.stdout is None:
             return
+        redact_secrets = self._task_security_settings.get(task_id, SecuritySettings()).redact_secrets
         while True:
             chunk = await process.stdout.read(4096)
             if not chunk:
                 return
             async with self._output_locks[task_id]:
                 with self._tasks[task_id].output_file.open("ab") as handle:
-                    handle.write(chunk)
+                    handle.write(
+                        redact_sensitive_text(
+                            chunk.decode("utf-8", errors="replace"),
+                            enabled=redact_secrets,
+                        ).encode("utf-8", errors="replace")
+                    )
 
     def _require_task(self, task_id: str) -> TaskRecord:
         task = self._tasks.get(task_id)
@@ -221,6 +284,7 @@ class BackgroundTaskManager:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            env={**os.environ, **self._task_env.get(task_id, {})},
         )
         self._processes[task_id] = process
         self._waiters[task_id] = asyncio.create_task(

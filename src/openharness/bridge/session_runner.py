@@ -7,6 +7,16 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from openharness.config.settings import SecuritySettings
+from openharness.security import (
+    SecuritySessionState,
+    enforce_command_guard,
+    resolve_security_session_state,
+    resolve_security_settings,
+    validate_process_workdir,
+)
+from openharness.security.execution import SecurityPermissionPrompt
+
 
 @dataclass
 class SessionHandle:
@@ -32,9 +42,28 @@ async def spawn_session(
     session_id: str,
     command: str,
     cwd: str | Path,
+    security_settings: SecuritySettings | dict[str, object] | None = None,
+    security_session_state: SecuritySessionState | None = None,
+    permission_prompt: SecurityPermissionPrompt | None = None,
 ) -> SessionHandle:
-    """Spawn a bridge-managed child session."""
-    resolved_cwd = Path(cwd).resolve()
+    """启动 bridge 管理的子会话，并在执行前套用统一安全守卫。"""
+
+    resolved_settings = resolve_security_settings(security_settings)
+    resolved_session_state = resolve_security_session_state(security_session_state)
+    workdir_error = validate_process_workdir(cwd)
+    if workdir_error is not None:
+        raise ValueError(workdir_error)
+    guard_error = await enforce_command_guard(
+        command,
+        tool_name="bridge_spawn",
+        security_settings=resolved_settings,
+        session_state=resolved_session_state,
+        permission_prompt=permission_prompt,
+    )
+    if guard_error is not None:
+        raise ValueError(guard_error)
+
+    resolved_cwd = Path(cwd).expanduser().resolve()
     process = await asyncio.create_subprocess_exec(
         "/bin/bash",
         "-lc",

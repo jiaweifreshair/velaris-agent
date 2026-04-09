@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -58,6 +58,18 @@ class SkillsSettings(BaseModel):
     max_index_entries: int = 200
 
 
+class SecuritySettings(BaseModel):
+    """安全防护配置。
+
+    该配置把高风险命令审批、上下文注入扫描和输出脱敏收敛到同一处，
+    让 Bash、提示词装配和 MCP 子进程都能复用统一策略。
+    """
+
+    approval_mode: Literal["manual", "smart", "off"] = "manual"
+    scan_project_instructions: bool = True
+    redact_secrets: bool = True
+
+
 class Settings(BaseModel):
     """Main settings model for OpenHarness."""
 
@@ -73,6 +85,7 @@ class Settings(BaseModel):
     hooks: dict[str, list[HookDefinition]] = Field(default_factory=dict)
     memory: MemorySettings = Field(default_factory=MemorySettings)
     skills: SkillsSettings = Field(default_factory=SkillsSettings)
+    security: SecuritySettings = Field(default_factory=SecuritySettings)
     enabled_plugins: dict[str, bool] = Field(default_factory=dict)
     mcp_servers: dict[str, McpServerConfig] = Field(default_factory=dict)
 

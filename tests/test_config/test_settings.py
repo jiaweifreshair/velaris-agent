@@ -18,6 +18,7 @@ class TestSettings:
         assert s.max_tokens == 16384
         assert s.fast_mode is False
         assert s.permission.mode == "default"
+        assert s.security.approval_mode == "manual"
 
     def test_resolve_api_key_from_instance(self):
         s = Settings(api_key="sk-test-123")
@@ -98,6 +99,24 @@ class TestLoadSaveSettings:
         s = load_settings(path)
         assert s.permission.mode == "full_auto"
         assert s.permission.allowed_tools == ["Bash", "Read"]
+
+    def test_load_with_security_settings(self, tmp_path: Path):
+        path = tmp_path / "settings.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "security": {
+                        "approval_mode": "smart",
+                        "scan_project_instructions": False,
+                    }
+                }
+            )
+        )
+
+        s = load_settings(path)
+
+        assert s.security.approval_mode == "smart"
+        assert s.security.scan_project_instructions is False
 
     def test_load_applies_env_overrides(self, tmp_path: Path, monkeypatch):
         path = tmp_path / "settings.json"

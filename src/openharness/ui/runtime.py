@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Awaitable, Callable
+from uuid import uuid4
 
 from openharness.api.client import AnthropicApiClient, SupportsStreamingMessages
 from openharness.api.provider import auth_status, detect_provider
@@ -20,6 +21,7 @@ from openharness.mcp.config import load_mcp_server_configs
 from openharness.permissions import PermissionChecker
 from openharness.plugins import load_plugins
 from openharness.prompts import build_runtime_system_prompt
+from openharness.security import SecuritySessionState
 from openharness.state import AppState, AppStateStore
 from openharness.services.session_storage import save_session_snapshot
 from openharness.skills.commands import (
@@ -109,6 +111,7 @@ async def build_runtime(
         api_key=api_key,
     )
     cwd = str(Path.cwd())
+    session_id = uuid4().hex[:12]
     plugins = load_plugins(settings, cwd)
     resolved_api_client = api_client or AnthropicApiClient(
         api_key=settings.resolve_api_key(),
@@ -119,6 +122,7 @@ async def build_runtime(
     tool_registry = create_default_tool_registry(mcp_manager)
     provider = detect_provider(settings)
     bridge_manager = get_bridge_manager()
+    security_session_state = SecuritySessionState()
     app_state = AppStateStore(
         AppState(
             model=settings.model,
@@ -149,6 +153,9 @@ async def build_runtime(
             cwd=Path(cwd).resolve(),
             api_client=resolved_api_client,
             default_model=settings.model,
+            security_settings=settings.security,
+            security_session_state=security_session_state,
+            permission_prompt=permission_prompt,
         ),
     )
     engine = QueryEngine(
@@ -162,10 +169,15 @@ async def build_runtime(
         permission_prompt=permission_prompt,
         ask_user_prompt=ask_user_prompt,
         hook_executor=hook_executor,
-        tool_metadata={"mcp_manager": mcp_manager, "bridge_manager": bridge_manager},
+        tool_metadata={
+            "mcp_manager": mcp_manager,
+            "bridge_manager": bridge_manager,
+            "security_settings": settings.security,
+            "security_session_state": security_session_state,
+            "session_id": session_id,
+        },
         skill_review_interval=settings.skills.creation_nudge_interval,
     )
-    from uuid import uuid4
 
     return RuntimeBundle(
         api_client=resolved_api_client,
@@ -177,7 +189,7 @@ async def build_runtime(
         engine=engine,
         commands=create_default_command_registry(),
         external_api_client=api_client is not None,
-        session_id=uuid4().hex[:12],
+        session_id=session_id,
     )
 
 

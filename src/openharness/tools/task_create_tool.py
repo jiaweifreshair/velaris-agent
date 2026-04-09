@@ -27,16 +27,29 @@ class TaskCreateTool(BaseTool):
     description = "Create a background shell or local-agent task."
     input_model = TaskCreateToolInput
 
-    async def execute(self, arguments: TaskCreateToolInput, context: ToolExecutionContext) -> ToolResult:
+    async def execute(  # type: ignore[override]
+        self,
+        arguments: TaskCreateToolInput,
+        context: ToolExecutionContext,
+    ) -> ToolResult:
         manager = get_task_manager()
+        security_settings = context.metadata.get("security_settings")
+        security_session_state = context.metadata.get("security_session_state")
+        permission_prompt = context.metadata.get("permission_prompt")
         if arguments.type == "local_bash":
             if not arguments.command:
                 return ToolResult(output="command is required for local_bash tasks", is_error=True)
-            task = await manager.create_shell_task(
-                command=arguments.command,
-                description=arguments.description,
-                cwd=context.cwd,
-            )
+            try:
+                task = await manager.create_shell_task(
+                    command=arguments.command,
+                    description=arguments.description,
+                    cwd=context.cwd,
+                    security_settings=security_settings,
+                    security_session_state=security_session_state,
+                    permission_prompt=permission_prompt if callable(permission_prompt) else None,
+                )
+            except ValueError as exc:
+                return ToolResult(output=str(exc), is_error=True)
         elif arguments.type == "local_agent":
             if not arguments.prompt:
                 return ToolResult(output="prompt is required for local_agent tasks", is_error=True)
@@ -47,6 +60,9 @@ class TaskCreateTool(BaseTool):
                     cwd=context.cwd,
                     model=arguments.model,
                     api_key=os.environ.get("ANTHROPIC_API_KEY"),
+                    security_settings=security_settings,
+                    security_session_state=security_session_state,
+                    permission_prompt=permission_prompt if callable(permission_prompt) else None,
                 )
             except ValueError as exc:
                 return ToolResult(output=str(exc), is_error=True)

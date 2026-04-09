@@ -32,7 +32,12 @@ def build_backend_command(
     system_prompt: str | None = None,
     api_key: str | None = None,
 ) -> list[str]:
-    """Return the command used by the React frontend to spawn the backend host."""
+    """返回 React 前端用于拉起 backend host 的命令。
+
+    敏感的 API key 不再通过命令行参数传递，避免它出现在进程列表或
+    前端配置 JSON 中；如有需要，由调用方通过环境变量透传给后端。
+    """
+
     command = [sys.executable, "-m", "velaris_agent", "--backend-only"]
     if cwd:
         command.extend(["--cwd", cwd])
@@ -42,8 +47,6 @@ def build_backend_command(
         command.extend(["--base-url", base_url])
     if system_prompt:
         command.extend(["--system-prompt", system_prompt])
-    if api_key:
-        command.extend(["--api-key", api_key])
     return command
 
 
@@ -90,6 +93,9 @@ async def launch_react_tui(
     )
     env["VELARIS_FRONTEND_CONFIG"] = frontend_config
     env["OPENHARNESS_FRONTEND_CONFIG"] = frontend_config
+    if api_key:
+        env["ANTHROPIC_API_KEY"] = api_key
+        env["VELARIS_API_KEY"] = api_key
     process = await asyncio.create_subprocess_exec(
         npm,
         "exec",

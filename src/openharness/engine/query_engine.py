@@ -8,6 +8,7 @@ from typing import AsyncIterator
 
 from openharness.config.settings import PermissionSettings
 from openharness.api.client import SupportsStreamingMessages
+from openharness.api.usage import UsageSnapshot
 from openharness.engine.cost_tracker import CostTracker
 from openharness.engine.messages import ConversationMessage
 from openharness.engine.query import AskUserPrompt, PermissionPrompt, QueryContext, run_query
@@ -69,7 +70,7 @@ class QueryEngine:
         return list(self._messages)
 
     @property
-    def total_usage(self):
+    def total_usage(self) -> UsageSnapshot:
         """Return the total usage across all turns."""
         return self._cost_tracker.total
 
@@ -99,6 +100,24 @@ class QueryEngine:
     def set_permission_checker(self, checker: PermissionChecker) -> None:
         """Update the active permission checker for future turns."""
         self._permission_checker = checker
+
+    def get_permission_prompt(self) -> PermissionPrompt | None:
+        """返回当前会话的权限审批回调。
+
+        Slash command 与其他运行时扩展需要复用同一套审批交互时，
+        通过该方法获取，而不是直接窥探私有字段。
+        """
+
+        return self._permission_prompt
+
+    def get_tool_metadata(self) -> dict[str, object]:
+        """返回当前运行时注入的工具元数据副本。
+
+        这样命令系统可以安全读取 security_settings 等共享上下文，
+        同时避免调用方直接原地修改引擎内部字典。
+        """
+
+        return dict(self._tool_metadata)
 
     def load_messages(self, messages: list[ConversationMessage]) -> None:
         """Replace the in-memory conversation history."""

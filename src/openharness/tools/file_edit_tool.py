@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from openharness.security import is_protected_write_path, resolve_tool_path
 from openharness.tools.base import BaseTool, ToolExecutionContext, ToolResult
 
 
@@ -25,12 +26,17 @@ class FileEditTool(BaseTool):
     description = "Edit an existing file by replacing a string."
     input_model = FileEditToolInput
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         arguments: FileEditToolInput,
         context: ToolExecutionContext,
     ) -> ToolResult:
-        path = _resolve_path(context.cwd, arguments.path)
+        path = resolve_tool_path(context.cwd, arguments.path)
+        if is_protected_write_path(path):
+            return ToolResult(
+                output=f"Write denied: {path} 是受保护的系统或凭据文件。",
+                is_error=True,
+            )
         if not path.exists():
             return ToolResult(output=f"File not found: {path}", is_error=True)
 
@@ -45,10 +51,3 @@ class FileEditTool(BaseTool):
 
         path.write_text(updated, encoding="utf-8")
         return ToolResult(output=f"Updated {path}")
-
-
-def _resolve_path(base: Path, candidate: str) -> Path:
-    path = Path(candidate).expanduser()
-    if not path.is_absolute():
-        path = base / path
-    return path.resolve()

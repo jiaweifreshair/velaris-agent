@@ -6,6 +6,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from openharness.config.settings import SecuritySettings
+from openharness.security import (
+    looks_like_sensitive_read_path,
+    redact_sensitive_text,
+    resolve_tool_path,
+)
 from openharness.tools.base import BaseTool, ToolExecutionContext, ToolResult
 
 
@@ -24,16 +30,24 @@ class FileReadTool(BaseTool):
     description = "Read a text file from the local repository."
     input_model = FileReadToolInput
 
-    def is_read_only(self, arguments: FileReadToolInput) -> bool:
+    def is_read_only(self, arguments: FileReadToolInput) -> bool:  # type: ignore[override]
         del arguments
         return True
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         arguments: FileReadToolInput,
         context: ToolExecutionContext,
     ) -> ToolResult:
-        path = _resolve_path(context.cwd, arguments.path)
+        security_settings_raw = context.metadata.get("security_settings")
+        if isinstance(security_settings_raw, SecuritySettings):
+            security_settings = security_settings_raw
+        elif isinstance(security_settings_raw, dict):
+            security_settings = SecuritySettings.model_validate(security_settings_raw)
+        else:
+            security_settings = SecuritySettings()
+
+        path = resolve_tool_path(context.cwd, arguments.path)
         if not path.exists():
             return ToolResult(output=f"File not found: {path}", is_error=True)
         if path.is_dir():
@@ -52,11 +66,7 @@ class FileReadTool(BaseTool):
         ]
         if not numbered:
             return ToolResult(output=f"(no content in selected range for {path})")
-        return ToolResult(output="\n".join(numbered))
-
-
-def _resolve_path(base: Path, candidate: str) -> Path:
-    path = Path(candidate).expanduser()
-    if not path.is_absolute():
-        path = base / path
-    return path.resolve()
+        output = "\n".join(numbered)
+        if security_settings.redact_secrets or looks_like_sensitive_read_path(path):
+            output = redact_sensitive_text(output, enabled=True)
+        return ToolResult(output=output)

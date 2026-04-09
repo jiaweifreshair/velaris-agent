@@ -6,7 +6,7 @@ import asyncio
 import fnmatch
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,14 @@ from openharness.hooks.schemas import (
     PromptHookDefinition,
 )
 from openharness.hooks.types import AggregatedHookResult, HookResult
+from openharness.config.settings import SecuritySettings
+from openharness.security import (
+    SecuritySessionState,
+    enforce_command_guard,
+    render_process_output,
+    validate_process_workdir,
+)
+from openharness.security.execution import SecurityPermissionPrompt
 
 
 @dataclass
@@ -33,6 +41,9 @@ class HookExecutionContext:
     cwd: Path
     api_client: SupportsStreamingMessages
     default_model: str
+    security_settings: SecuritySettings = field(default_factory=SecuritySettings)
+    security_session_state: SecuritySessionState = field(default_factory=SecuritySessionState)
+    permission_prompt: SecurityPermissionPrompt | None = None
 
 
 class HookExecutor:
@@ -69,6 +80,29 @@ class HookExecutor:
         payload: dict[str, Any],
     ) -> HookResult:
         command = _inject_arguments(hook.command, payload)
+        workdir_error = validate_process_workdir(self._context.cwd)
+        if workdir_error is not None:
+            return HookResult(
+                hook_type=hook.type,
+                success=False,
+                blocked=hook.block_on_failure,
+                reason=workdir_error,
+            )
+        guard_error = await enforce_command_guard(
+            command,
+            tool_name="hook_command",
+            security_settings=self._context.security_settings,
+            session_state=self._context.security_session_state,
+            permission_prompt=self._context.permission_prompt,
+        )
+        if guard_error is not None:
+            return HookResult(
+                hook_type=hook.type,
+                success=False,
+                blocked=hook.block_on_failure,
+                reason=guard_error,
+            )
+
         process = await asyncio.create_subprocess_exec(
             "/bin/bash",
             "-lc",
@@ -100,11 +134,10 @@ class HookExecutor:
                 reason=f"command hook timed out after {hook.timeout_seconds}s",
             )
 
-        output = "\n".join(
-            part for part in (
-                stdout.decode("utf-8", errors="replace").strip(),
-                stderr.decode("utf-8", errors="replace").strip(),
-            ) if part
+        output = render_process_output(
+            stdout=stdout,
+            stderr=stderr,
+            redact_secrets=self._context.security_settings.redact_secrets,
         )
         success = process.returncode == 0
         return HookResult(
@@ -171,7 +204,7 @@ class HookExecutor:
 
         text_chunks: list[str] = []
         final_event: ApiMessageCompleteEvent | None = None
-        async for event_item in self._context.api_client.stream_message(request):
+        async for event_item in self._context.api_client.stream_message(request):  # type: ignore[attr-defined]
             if isinstance(event_item, ApiMessageCompleteEvent):
                 final_event = event_item
             else:

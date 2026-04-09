@@ -9,7 +9,7 @@ import pytest
 
 from openharness.api.client import ApiMessageCompleteEvent, ApiTextDeltaEvent
 from openharness.api.usage import UsageSnapshot
-from openharness.config.settings import PermissionSettings
+from openharness.config.settings import PathRuleConfig, PermissionSettings
 from openharness.engine.messages import ConversationMessage, TextBlock, ToolUseBlock
 from openharness.engine.query_engine import QueryEngine
 from openharness.engine.stream_events import (
@@ -249,3 +249,54 @@ async def test_query_engine_executes_ask_user_tool(tmp_path: Path):
     assert tool_results[0].output == "green"
     assert isinstance(events[-1], AssistantTurnComplete)
     assert events[-1].message.text == "Picked green."
+
+
+@pytest.mark.asyncio
+async def test_query_engine_applies_path_rules_to_path_argument(tmp_path: Path):
+    """path 形式的文件参数也应走权限系统，而不是只识别 file_path。"""
+
+    target = tmp_path / "protected.txt"
+
+    engine = QueryEngine(
+        api_client=FakeApiClient(
+            [
+                _FakeResponse(
+                    message=ConversationMessage(
+                        role="assistant",
+                        content=[
+                            ToolUseBlock(
+                                id="toolu_write",
+                                name="write_file",
+                                input={"path": str(target), "content": "top secret"},
+                            ),
+                        ],
+                    ),
+                    usage=UsageSnapshot(input_tokens=1, output_tokens=1),
+                ),
+                _FakeResponse(
+                    message=ConversationMessage(
+                        role="assistant",
+                        content=[TextBlock(text="done")],
+                    ),
+                    usage=UsageSnapshot(input_tokens=1, output_tokens=1),
+                ),
+            ]
+        ),
+        tool_registry=create_default_tool_registry(),
+        permission_checker=PermissionChecker(
+            PermissionSettings(
+                path_rules=[PathRuleConfig(pattern=str(target), allow=False)],
+            )
+        ),
+        cwd=tmp_path,
+        model="claude-test",
+        system_prompt="system",
+    )
+
+    events = [event async for event in engine.submit_message("write protected file")]
+
+    tool_results = [event for event in events if isinstance(event, ToolExecutionCompleted)]
+    assert tool_results
+    assert tool_results[0].is_error is True
+    assert "deny rule" in tool_results[0].output
+    assert not target.exists()

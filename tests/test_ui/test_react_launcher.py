@@ -22,7 +22,7 @@ def test_build_backend_command_includes_flags():
     assert "--model" in command
     assert "--base-url" in command
     assert "--system-prompt" in command
-    assert "--api-key" in command
+    assert "--api-key" not in command
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ from openharness.config.settings import Settings
 from openharness.memory import find_relevant_memories, load_memory_prompt
 from openharness.prompts.claudemd import load_claude_md_prompt
 from openharness.prompts.system_prompt import build_system_prompt
+from openharness.security import scan_context_content, truncate_context_content
 from openharness.skills.prompt_index import build_skills_system_prompt
 
 
@@ -42,7 +43,10 @@ def build_runtime_system_prompt(
     if skills_section:
         sections.append(skills_section)
 
-    claude_md = load_claude_md_prompt(cwd)
+    claude_md = load_claude_md_prompt(
+        cwd,
+        scan_for_injection=settings.security.scan_project_instructions,
+    )
     if claude_md:
         sections.append(claude_md)
 
@@ -53,6 +57,12 @@ def build_runtime_system_prompt(
         if path.exists():
             content = path.read_text(encoding="utf-8", errors="replace").strip()
             if content:
+                content = scan_context_content(
+                    content,
+                    title,
+                    enabled=settings.security.scan_project_instructions,
+                )
+                content = truncate_context_content(content, title, max_chars=12000)
                 sections.append(f"# {title}\n\n```md\n{content[:12000]}\n```")
 
     if settings.memory.enabled:

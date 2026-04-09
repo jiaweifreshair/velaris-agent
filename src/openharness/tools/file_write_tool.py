@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from openharness.security import is_protected_write_path, resolve_tool_path
 from openharness.tools.base import BaseTool, ToolExecutionContext, ToolResult
 
 
@@ -24,20 +25,18 @@ class FileWriteTool(BaseTool):
     description = "Create or overwrite a text file in the local repository."
     input_model = FileWriteToolInput
 
-    async def execute(
+    async def execute(  # type: ignore[override]
         self,
         arguments: FileWriteToolInput,
         context: ToolExecutionContext,
     ) -> ToolResult:
-        path = _resolve_path(context.cwd, arguments.path)
+        path = resolve_tool_path(context.cwd, arguments.path)
+        if is_protected_write_path(path):
+            return ToolResult(
+                output=f"Write denied: {path} 是受保护的系统或凭据文件。",
+                is_error=True,
+            )
         if arguments.create_directories:
             path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(arguments.content, encoding="utf-8")
         return ToolResult(output=f"Wrote {path}")
-
-
-def _resolve_path(base: Path, candidate: str) -> Path:
-    path = Path(candidate).expanduser()
-    if not path.is_absolute():
-        path = base / path
-    return path.resolve()

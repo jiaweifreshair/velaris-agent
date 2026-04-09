@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
-from typing import Any
+from typing import Any, cast
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -14,6 +14,12 @@ from openharness.mcp.types import (
     McpResourceInfo,
     McpStdioServerConfig,
     McpToolInfo,
+)
+from openharness.security import (
+    build_safe_mcp_env,
+    redact_sensitive_text,
+    sanitize_mcp_error,
+    validate_workdir,
 )
 
 
@@ -39,12 +45,13 @@ class McpClientManager:
             if isinstance(config, McpStdioServerConfig):
                 await self._connect_stdio(name, config)
             else:
+                transport = str(getattr(config, "type", "unknown"))
                 self._statuses[name] = McpConnectionStatus(
                     name=name,
                     state="failed",
-                    transport=config.type,
+                    transport=transport,
                     auth_configured=bool(getattr(config, "headers", None)),
-                    detail=f"Unsupported MCP transport in current build: {config.type}",
+                    detail=f"Unsupported MCP transport in current build: {transport}",
                 )
 
     async def reconnect_all(self) -> None:
@@ -103,12 +110,12 @@ class McpClientManager:
             parts.append(str(result.structuredContent))
         if not parts:
             parts.append("(no output)")
-        return "\n".join(parts).strip()
+        return redact_sensitive_text("\n".join(parts).strip())
 
     async def read_resource(self, server_name: str, uri: str) -> str:
         """Read one MCP resource and stringify the response."""
         session = self._sessions[server_name]
-        result: ReadResourceResult = await session.read_resource(uri)
+        result: ReadResourceResult = await session.read_resource(cast(Any, uri))
         parts: list[str] = []
         for item in result.contents:
             text = getattr(item, "text", None)
@@ -116,17 +123,28 @@ class McpClientManager:
                 parts.append(text)
             else:
                 parts.append(str(getattr(item, "blob", "")))
-        return "\n".join(parts).strip()
+        return redact_sensitive_text("\n".join(parts).strip())
 
     async def _connect_stdio(self, name: str, config: McpStdioServerConfig) -> None:
         stack = AsyncExitStack()
         try:
+            workdir_error = validate_workdir(config.cwd or "")
+            if workdir_error is not None:
+                self._statuses[name] = McpConnectionStatus(
+                    name=name,
+                    state="failed",
+                    transport=config.type,
+                    auth_configured=bool(config.env),
+                    detail=workdir_error,
+                )
+                return
+
             read_stream, write_stream = await stack.enter_async_context(
                 stdio_client(
                     StdioServerParameters(
                         command=config.command,
                         args=config.args,
-                        env=config.env,
+                        env=build_safe_mcp_env(config.env),
                         cwd=config.cwd,
                     )
                 )
@@ -170,5 +188,5 @@ class McpClientManager:
                 state="failed",
                 transport=config.type,
                 auth_configured=bool(config.env),
-                detail=str(exc),
+                detail=sanitize_mcp_error(str(exc)),
             )
