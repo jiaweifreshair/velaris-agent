@@ -83,10 +83,47 @@ class SaveDecisionTool(BaseTool):
             )
 
             saved_id = memory.save(record)
+            review_interval = int(context.metadata.get("evolution_review_interval", 10))
+            self_evolution_payload: dict[str, Any] = {
+                "triggered": False,
+                "next_trigger_in": None,
+            }
+
+            # 参考 Hermes 的后台 review 机制：每 N 条决策触发一次轻量复盘，
+            # 不阻塞主链路，但把“是否该进化”变成可追踪信号。
+            if review_interval > 0:
+                current_count = memory.count_by_user(
+                    user_id=arguments.user_id,
+                    scenario=arguments.scenario,
+                )
+                remain = review_interval - (current_count % review_interval)
+                self_evolution_payload["next_trigger_in"] = 0 if remain == review_interval else remain
+
+                if current_count % review_interval == 0:
+                    from velaris_agent.evolution.self_evolution import SelfEvolutionEngine
+
+                    engine = SelfEvolutionEngine(
+                        memory=memory,
+                        report_dir=context.metadata.get("evolution_report_dir"),
+                    )
+                    report = engine.review(
+                        user_id=arguments.user_id,
+                        scenario=arguments.scenario,
+                        window=max(10, review_interval * 2),
+                        persist_report=True,
+                    )
+                    self_evolution_payload = {
+                        "triggered": True,
+                        "report_path": report.report_path,
+                        "sample_size": report.sample_size,
+                        "actions": [a.model_dump(mode="json") for a in report.actions],
+                    }
+
             result = {
                 "decision_id": saved_id,
                 "status": "saved",
                 "message": f"决策记录已保存, ID: {saved_id}",
+                "self_evolution": self_evolution_payload,
             }
             return ToolResult(output=json.dumps(result, ensure_ascii=False))
 

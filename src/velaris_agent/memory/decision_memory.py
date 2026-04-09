@@ -129,6 +129,21 @@ class DecisionMemory:
                 break
         return results
 
+    def count_by_user(
+        self,
+        user_id: str,
+        scenario: str | None = None,
+    ) -> int:
+        """统计用户在指定场景下的历史决策数量。"""
+        count = 0
+        for entry in self._scan_index_reversed():
+            if entry.get("user_id") != user_id:
+                continue
+            if scenario and entry.get("scenario") != scenario:
+                continue
+            count += 1
+        return count
+
     def recall_similar(
         self,
         user_id: str,

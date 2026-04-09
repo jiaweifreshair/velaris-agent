@@ -93,6 +93,19 @@ def test_list_by_user(tmp_path: Path):
     assert len(all_b) == 1
 
 
+def test_count_by_user(tmp_path: Path):
+    """按用户统计应支持场景过滤。"""
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    mem.save(_make_record(decision_id="dec-c1", user_id="uA", scenario="travel"))
+    mem.save(_make_record(decision_id="dec-c2", user_id="uA", scenario="travel"))
+    mem.save(_make_record(decision_id="dec-c3", user_id="uA", scenario="tokencost"))
+    mem.save(_make_record(decision_id="dec-c4", user_id="uB", scenario="travel"))
+
+    assert mem.count_by_user("uA") == 3
+    assert mem.count_by_user("uA", scenario="travel") == 2
+    assert mem.count_by_user("uB", scenario="travel") == 1
+
+
 def test_recall_similar(tmp_path: Path):
     """关键词匹配召回相似决策 (按空格分词)。"""
     mem = DecisionMemory(base_dir=tmp_path / "decisions")

@@ -23,6 +23,9 @@ from openharness.tools.file_read_tool import FileReadTool
 from openharness.tools.file_write_tool import FileWriteTool
 from openharness.tools.glob_tool import GlobTool
 from openharness.tools.grep_tool import GrepTool
+from openharness.tools.knowledge_ingest_tool import KnowledgeIngestTool
+from openharness.tools.knowledge_lint_tool import KnowledgeLintTool
+from openharness.tools.knowledge_query_tool import KnowledgeQueryTool
 from openharness.tools.lifegoal_tool import LifeGoalTool
 from openharness.tools.list_mcp_resources_tool import ListMcpResourcesTool
 from openharness.tools.lsp_tool import LspTool
@@ -36,6 +39,7 @@ from openharness.tools.read_mcp_resource_tool import ReadMcpResourceTool
 from openharness.tools.remote_trigger_tool import RemoteTriggerTool
 from openharness.tools.save_decision_tool import SaveDecisionTool
 from openharness.tools.send_message_tool import SendMessageTool
+from openharness.tools.self_evolution_review_tool import SelfEvolutionReviewTool
 from openharness.tools.skill_tool import SkillTool
 from openharness.tools.sleep_tool import SleepTool
 from openharness.tools.task_create_tool import TaskCreateTool
@@ -67,8 +71,12 @@ def create_default_tool_registry(mcp_manager=None) -> ToolRegistry:
         RecallPreferencesTool(),
         RecallDecisionsTool(),
         SaveDecisionTool(),
+        SelfEvolutionReviewTool(),
         DecisionScoreTool(),
         LifeGoalTool(),
+        KnowledgeIngestTool(),
+        KnowledgeQueryTool(),
+        KnowledgeLintTool(),
         TravelRecommendTool(),
         TokenCostAnalyzeTool(),
         RobotClawDispatchTool(),
