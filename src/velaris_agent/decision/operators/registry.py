@@ -24,7 +24,7 @@ class OperatorRegistry:
 
 
 def build_default_operator_registry() -> OperatorRegistry:
-    """构造 procurement graph 的过渡态 registry。"""
+    """构造 procurement graph 的 Phase 3 默认 registry。"""
 
     default_graph = [
         OperatorSpec("intent"),
@@ -32,7 +32,8 @@ def build_default_operator_registry() -> OperatorRegistry:
         OperatorSpec("normalization"),
         OperatorSpec("stakeholder"),
         OperatorSpec("feasibility"),
-        OperatorSpec("optimization"),
+        OperatorSpec("pareto_frontier"),
+        OperatorSpec("operating_point_selector"),
         OperatorSpec("negotiation"),
         OperatorSpec("bias_audit"),
         OperatorSpec("explanation"),

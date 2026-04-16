@@ -7,6 +7,9 @@ from velaris_agent.decision.operators.feasibility_op import FeasibilityOp
 from velaris_agent.decision.operators.intent_op import IntentOp
 from velaris_agent.decision.operators.normalization_op import NormalizationOp
 from velaris_agent.decision.operators.option_discovery_op import OptionDiscoveryOp
+from velaris_agent.decision.operators.operating_point_selector_op import (
+    OperatingPointSelectorOp,
+)
 from velaris_agent.decision.operators.pareto_frontier_op import ParetoFrontierOp
 
 
@@ -172,3 +175,68 @@ def test_pareto_frontier_op_keeps_only_non_dominated_feasible_options() -> None:
         "premium-safe",
     ]
     assert context.frontier_metrics[1]["dominated_option_ids"] == ["dominated-mid"]
+
+
+def test_operating_point_selector_scores_only_frontier_and_keeps_dominated_tail() -> None:
+    """OperatingPointSelectorOp 只在 frontier 内选点，并把 dominated options 追加到尾部。"""
+
+    context = _build_procurement_context(
+        decision_weights={
+            "cost": 0.10,
+            "quality": 0.60,
+            "delivery": 0.10,
+            "compliance": 0.10,
+            "risk": 0.10,
+        },
+        options=[
+            {
+                "id": "budget-choice",
+                "label": "低价方案",
+                "price_cny": 100000,
+                "delivery_days": 7,
+                "quality_score": 0.70,
+                "compliance_score": 0.95,
+                "risk_score": 0.10,
+                "available": True,
+            },
+            {
+                "id": "premium-choice",
+                "label": "高质量方案",
+                "price_cny": 170000,
+                "delivery_days": 7,
+                "quality_score": 0.95,
+                "compliance_score": 0.95,
+                "risk_score": 0.10,
+                "available": True,
+            },
+            {
+                "id": "dominated-choice",
+                "label": "被支配方案",
+                "price_cny": 175000,
+                "delivery_days": 8,
+                "quality_score": 0.90,
+                "compliance_score": 0.95,
+                "risk_score": 0.12,
+                "available": True,
+            },
+        ],
+    )
+
+    context = IntentOp().run(context)
+    context = OptionDiscoveryOp().run(context)
+    context = NormalizationOp().run(context)
+    context = FeasibilityOp().run(context)
+    context = ParetoFrontierOp().run(context)
+    context = OperatingPointSelectorOp().run(context)
+
+    assert context.recommended_option_id == "premium-choice"
+    assert [item.option_id for item in context.ranked_options] == [
+        "premium-choice",
+        "budget-choice",
+        "dominated-choice",
+    ]
+    assert context.operating_point_summary["frontier_option_ids"] == [
+        "budget-choice",
+        "premium-choice",
+    ]
+    assert context.operating_point_summary["selector"] == "weighted_sum_over_frontier"

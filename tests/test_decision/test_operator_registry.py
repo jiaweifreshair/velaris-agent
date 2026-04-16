@@ -8,7 +8,7 @@ from velaris_agent.decision.operators.registry import build_default_operator_reg
 
 
 def test_operator_registry_returns_default_procurement_graph() -> None:
-    """默认 registry 应在过渡态先接入 feasibility，再复用既有 optimization。"""
+    """默认 registry 应切到 feasibility + pareto + operating-point 链。"""
 
     registry = build_default_operator_registry()
     graph = registry.get_graph("procurement")
@@ -19,7 +19,8 @@ def test_operator_registry_returns_default_procurement_graph() -> None:
         "normalization",
         "stakeholder",
         "feasibility",
-        "optimization",
+        "pareto_frontier",
+        "operating_point_selector",
         "negotiation",
         "bias_audit",
         "explanation",

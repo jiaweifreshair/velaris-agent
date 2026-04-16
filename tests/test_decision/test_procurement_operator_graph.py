@@ -111,12 +111,27 @@ def test_procurement_graph_returns_recommendation_and_trace() -> None:
     assert result.accepted_option_ids == ["vendor-a"]
     assert result.rejected_option_ids == ["vendor-b"]
     assert result.rejection_reasons["vendor-b"] == ["budget_exceeded"]
+    assert result.pareto_frontier_ids == ["vendor-a"]
+    assert result.dominated_option_ids == []
+    assert result.operating_point_summary["selected_option_id"] == "vendor-a"
+    assert [trace.operator_id for trace in result.operator_traces] == [
+        "intent",
+        "option_discovery",
+        "normalization",
+        "stakeholder",
+        "feasibility",
+        "pareto_frontier",
+        "operating_point_selector",
+        "negotiation",
+        "bias_audit",
+        "explanation",
+    ]
     assert result.operator_traces[-1].operator_id == "explanation"
     assert result.operator_traces[-1].evidence_refs == [
         "quote://vendor-a",
         "policy://approved-vendors",
     ]
-    assert result.explanation.startswith("推荐 供应商 A")
+    assert "Pareto 前沿" in result.explanation
 
 
 def test_procurement_graph_uses_cost_and_delivery_in_ranking() -> None:
@@ -206,3 +221,5 @@ def test_procurement_graph_honors_payload_decision_weights() -> None:
     )
 
     assert result.recommended_option_id == "premium-choice"
+    assert result.pareto_frontier_ids == ["budget-choice", "premium-choice"]
+    assert result.operating_point_summary["selector"] == "weighted_sum_over_frontier"

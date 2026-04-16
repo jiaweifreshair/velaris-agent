@@ -13,7 +13,10 @@ from velaris_agent.decision.operators.intent_op import IntentOp
 from velaris_agent.decision.operators.negotiation_op import NegotiationOp
 from velaris_agent.decision.operators.normalization_op import NormalizationOp
 from velaris_agent.decision.operators.option_discovery_op import OptionDiscoveryOp
-from velaris_agent.decision.operators.optimization_op import OptimizationOp
+from velaris_agent.decision.operators.operating_point_selector_op import (
+    OperatingPointSelectorOp,
+)
+from velaris_agent.decision.operators.pareto_frontier_op import ParetoFrontierOp
 from velaris_agent.decision.operators.registry import build_default_operator_registry
 from velaris_agent.decision.operators.stakeholder_op import StakeholderOp
 
@@ -28,7 +31,8 @@ def build_default_operators_for_scenario(scenario: str) -> list[DecisionOperator
         "normalization": NormalizationOp,
         "stakeholder": StakeholderOp,
         "feasibility": FeasibilityOp,
-        "optimization": OptimizationOp,
+        "pareto_frontier": ParetoFrontierOp,
+        "operating_point_selector": OperatingPointSelectorOp,
         "negotiation": NegotiationOp,
         "bias_audit": BiasAuditOp,
         "explanation": ExplanationOp,

@@ -6,7 +6,7 @@ from openharness.biz.engine import run_scenario
 
 
 def test_run_procurement_scenario_exposes_operator_trace_without_breaking_protocol() -> None:
-    """采购场景应保留旧协议，同时暴露加入 feasibility 后的 operator trace。"""
+    """采购场景应保留旧协议，同时暴露 Pareto 链的 operator trace。"""
 
     result = run_scenario(
         "procurement",
@@ -51,7 +51,8 @@ def test_run_procurement_scenario_exposes_operator_trace_without_breaking_protoc
         "normalization",
         "stakeholder",
         "feasibility",
-        "optimization",
+        "pareto_frontier",
+        "operating_point_selector",
         "negotiation",
         "bias_audit",
         "explanation",
