@@ -10,7 +10,11 @@ from uuid import uuid4
 
 @dataclass
 class TaskLedgerRecord:
-    """任务账本记录。"""
+    """任务账本记录。
+
+    这个数据结构统一描述运行时任务的最小状态快照，
+    让内存后端与 PostgreSQL 后端可以共用同一份序列化形态。
+    """
 
     task_id: str
     session_id: str
@@ -26,6 +30,27 @@ class TaskLedgerRecord:
     def to_dict(self) -> dict[str, Any]:
         """把任务记录转换为 JSON 友好的字典。"""
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "TaskLedgerRecord":
+        """从持久化 payload 还原任务记录。
+
+        这样 PostgreSQL 仓储可以直接复用内存账本的数据模型，
+        避免在两套后端之间出现字段漂移。
+        """
+
+        return cls(
+            task_id=str(payload["task_id"]),
+            session_id=str(payload["session_id"]),
+            runtime=str(payload["runtime"]),
+            role=str(payload["role"]),
+            objective=str(payload["objective"]),
+            status=str(payload["status"]),
+            depends_on=[str(item) for item in payload.get("depends_on", [])],
+            created_at=str(payload.get("created_at", "")),
+            updated_at=str(payload.get("updated_at", "")),
+            error=str(payload["error"]) if payload.get("error") is not None else None,
+        )
 
 
 class TaskLedger:

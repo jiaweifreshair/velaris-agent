@@ -38,6 +38,160 @@ def test_score_options_returns_ranked_results():
     assert ranked[0]["total_score"] >= ranked[1]["total_score"]
 
 
+def test_run_travel_scenario_returns_confirmable_protocol():
+    result = run_scenario(
+        scenario="travel",
+        payload={
+            "query": "下周三从北京到上海出差，预算 2000 以内，只看直飞",
+            "user_id": "u-travel",
+            "session_id": "session-travel-demo",
+            "options": [
+                {
+                    "id": "travel-a",
+                    "label": "北京-上海 08:30 直飞",
+                    "price": 1680,
+                    "duration_minutes": 140,
+                    "comfort": 0.83,
+                    "direct": True,
+                    "supplier": "东方航空",
+                },
+                {
+                    "id": "travel-b",
+                    "label": "北京-上海 07:10 转机",
+                    "price": 1200,
+                    "duration_minutes": 320,
+                    "comfort": 0.51,
+                    "direct": False,
+                    "supplier": "某 OTA",
+                },
+            ],
+        },
+    )
+
+    assert result["scenario"] == "travel"
+    assert result["intent"] == "travel_compare"
+    assert result["status"] == "requires_confirmation"
+    assert result["intent_slots"]["origin"] == "北京"
+    assert result["intent_slots"]["destination"] == "上海"
+    assert result["intent_slots"]["budget_max"] == 2000
+    assert result["intent_slots"]["direct_only"] is True
+    assert result["recommended"]["id"] == "travel-a"
+    assert result["requires_confirmation"] is True
+    assert result["next_actions"][0]["action"] == "confirm_travel_option"
+
+
+def test_run_travel_scenario_can_complete_after_confirmation():
+    result = run_scenario(
+        scenario="travel",
+        payload={
+            "query": "帮我订北京到上海的商务出差机票",
+            "user_id": "u-travel",
+            "session_id": "session-travel-confirm",
+            "confirm": True,
+            "selected_option_id": "travel-a",
+            "proposal_id": "travel-proposal-demo",
+            "options": [
+                {
+                    "id": "travel-a",
+                    "label": "北京-上海 08:30 直飞",
+                    "price": 1680,
+                    "duration_minutes": 140,
+                    "comfort": 0.83,
+                    "direct": True,
+                },
+                {
+                    "id": "travel-b",
+                    "label": "北京-上海 07:10 转机",
+                    "price": 1200,
+                    "duration_minutes": 320,
+                    "comfort": 0.51,
+                    "direct": False,
+                },
+            ],
+        },
+    )
+
+    assert result["status"] == "completed"
+    assert result["execution_status"] == "completed"
+    assert result["recommended"]["id"] == "travel-a"
+    assert result["external_ref"].startswith("TRAVEL-")
+    assert result["audit_trace"]["proposal_id"] == "travel-proposal-demo"
+    assert result["audit_trace"]["selected_option_id"] == "travel-a"
+
+
+def test_run_travel_scenario_extracts_clean_route_from_business_query():
+    result = run_scenario(
+        scenario="travel",
+        payload={
+            "query": "帮我规划一次上海到北京的商务出行，同时给客户准备鲜花、餐厅和咖啡安排。",
+            "options": [
+                {
+                    "id": "travel-sha-pek-direct",
+                    "label": "上海-北京 09:00 直飞",
+                    "price": 1760,
+                    "duration_minutes": 135,
+                    "comfort": 0.86,
+                    "direct": True,
+                    "origin": "上海",
+                    "destination": "北京",
+                },
+                {
+                    "id": "travel-pek-sha-direct",
+                    "label": "北京-上海 08:30 直飞",
+                    "price": 1680,
+                    "duration_minutes": 140,
+                    "comfort": 0.83,
+                    "direct": True,
+                    "origin": "北京",
+                    "destination": "上海",
+                },
+            ],
+        },
+    )
+
+    assert result["intent_slots"]["origin"] == "上海"
+    assert result["intent_slots"]["destination"] == "北京"
+    assert result["recommended"]["id"] == "travel-sha-pek-direct"
+    assert result["recommended"]["label"].startswith("上海-北京")
+
+
+def test_run_travel_scenario_aligns_demo_route_label_with_query():
+    result = run_scenario(
+        scenario="travel",
+        payload={
+            "query": "帮我规划一次上海到北京的商务出行。",
+            "options": [
+                {
+                    "id": "travel-demo-a",
+                    "label": "北京-上海 08:30 直飞",
+                    "price": 1680,
+                    "duration_minutes": 140,
+                    "comfort": 0.83,
+                    "direct": True,
+                    "origin": "北京",
+                    "destination": "上海",
+                },
+                {
+                    "id": "travel-demo-b",
+                    "label": "北京-上海 12:10 直飞",
+                    "price": 1920,
+                    "duration_minutes": 145,
+                    "comfort": 0.88,
+                    "direct": True,
+                    "origin": "北京",
+                    "destination": "上海",
+                },
+            ],
+        },
+    )
+
+    assert result["intent_slots"]["origin"] == "上海"
+    assert result["intent_slots"]["destination"] == "北京"
+    assert result["recommended"]["label"].startswith("上海-北京")
+    assert result["recommended"]["metadata"]["origin"] == "上海"
+    assert result["recommended"]["metadata"]["destination"] == "北京"
+
+
 def test_run_tokencost_scenario_returns_projected_cost():
     result = run_scenario(
         scenario="tokencost",
