@@ -64,6 +64,7 @@ class DecisionScoreTool(BaseTool):
         """执行评分排序。"""
         try:
             from velaris_agent.biz.engine import score_options
+            from velaris_agent.persistence.factory import build_decision_memory
 
             effective_weights = dict(arguments.weights) if arguments.weights else {}
             personalized = False
@@ -71,11 +72,14 @@ class DecisionScoreTool(BaseTool):
             # 尝试使用个性化权重
             if arguments.user_id and arguments.scenario:
                 try:
-                    from velaris_agent.memory.decision_memory import DecisionMemory
                     from velaris_agent.memory.preference_learner import PreferenceLearner
 
                     base_dir = context.metadata.get("decision_memory_dir")
-                    memory = DecisionMemory(base_dir=base_dir)
+                    postgres_dsn = context.metadata.get("postgres_dsn", "")
+                    memory = build_decision_memory(
+                        postgres_dsn=postgres_dsn,
+                        base_dir=base_dir,
+                    )
                     learner = PreferenceLearner(memory)
 
                     prefs = learner.compute_preferences(

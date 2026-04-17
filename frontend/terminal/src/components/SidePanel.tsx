@@ -1,6 +1,7 @@
 import React from 'react';
 import {Box, Text} from 'ink';
 
+import {describeMcpNotice} from './mcpNotice.js';
 import type {BridgeSessionSnapshot, McpServerSnapshot, TaskSnapshot} from '../types.js';
 
 export function SidePanel({
@@ -30,6 +31,8 @@ export function SidePanel({
 }
 
 function StatusPanel({status}: {status: Record<string, unknown>}): React.JSX.Element {
+	const mcpNotice = describeMcpNotice(status.mcp_notice, status.mcp_notice_level);
+
 	return (
 		<>
 			<Text bold>Status</Text>
@@ -45,6 +48,7 @@ function StatusPanel({status}: {status: Record<string, unknown>}): React.JSX.Ele
 				<Text>fast: {String(Boolean(status.fast_mode))}</Text>
 				<Text>effort: {String(status.effort ?? 'medium')}</Text>
 				<Text>passes: {String(status.passes ?? 1)}</Text>
+				{mcpNotice ? <Text color={mcpNotice.color}>{mcpNotice.label}: {mcpNotice.message}</Text> : null}
 			</Box>
 		</>
 	);
@@ -83,18 +87,21 @@ function McpPanel({servers}: {servers: McpServerSnapshot[]}): React.JSX.Element 
 				{servers.length === 0 ? (
 					<Text>(none)</Text>
 				) : (
-					servers.slice(0, 5).map((server) => (
-						<Box key={server.name} flexDirection="column">
-							<Text>
-								{server.name} [{server.state}] {server.transport ?? 'unknown'}
-							</Text>
-							<Text dimColor>
-								auth={String(Boolean(server.auth_configured))} tools={String(server.tool_count ?? 0)} resources=
-								{String(server.resource_count ?? 0)}
-							</Text>
-							{server.detail ? <Text dimColor>{server.detail}</Text> : null}
-						</Box>
-					))
+					servers.slice(0, 5).map((server) => {
+						const detailNotice = describeMcpNotice(server.detail, server.detail_level);
+						return (
+							<Box key={server.name} flexDirection="column">
+								<Text>
+									{server.name} [{server.state}] {server.transport ?? 'unknown'}
+								</Text>
+								<Text dimColor>
+									auth={String(Boolean(server.auth_configured))} tools={String(server.tool_count ?? 0)} resources=
+									{String(server.resource_count ?? 0)}
+								</Text>
+								{detailNotice ? <Text color={detailNotice.color}>{detailNotice.label}: {detailNotice.message}</Text> : null}
+							</Box>
+						);
+					})
 				)}
 			</Box>
 		</>

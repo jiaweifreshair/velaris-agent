@@ -3,6 +3,7 @@
 from openharness.services.compact import (
     compact_messages,
     estimate_conversation_tokens,
+    get_autocompact_threshold,
     summarize_messages,
 )
 from openharness.services.session_storage import (
@@ -19,6 +20,7 @@ __all__ = [
     "estimate_message_tokens",
     "estimate_tokens",
     "export_session_markdown",
+    "get_autocompact_threshold",
     "get_project_session_dir",
     "load_session_snapshot",
     "save_session_snapshot",

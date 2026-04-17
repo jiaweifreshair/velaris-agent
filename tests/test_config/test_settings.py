@@ -29,6 +29,12 @@ class TestSettings:
         s = Settings()
         assert s.resolve_api_key() == "sk-env-456"
 
+    def test_resolve_api_key_from_openai_compatible_env(self, monkeypatch):
+        """OpenAI-compatible provider 应读取对应环境变量。"""
+        monkeypatch.setenv("MOONSHOT_API_KEY", "moonshot-key")
+        s = Settings(provider="moonshot", api_format="openai_compat", model="kimi-k2")
+        assert s.resolve_api_key() == "moonshot-key"
+
     def test_resolve_api_key_instance_takes_precedence(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-456")
         s = Settings(api_key="sk-instance-789")
@@ -130,3 +136,17 @@ class TestLoadSaveSettings:
         assert s.model == "from-env-model"
         assert s.base_url == "https://env.example/anthropic"
         assert s.api_key == "sk-env-override"
+
+    def test_load_applies_provider_and_compact_env_overrides(self, tmp_path: Path, monkeypatch):
+        """Provider 和 compact 阈值应允许通过环境变量覆盖。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"provider": "anthropic", "api_format": "anthropic"}))
+        monkeypatch.setenv("VELARIS_PROVIDER", "moonshot")
+        monkeypatch.setenv("VELARIS_API_FORMAT", "openai_compat")
+        monkeypatch.setenv("VELARIS_AUTO_COMPACT_THRESHOLD_TOKENS", "54321")
+
+        s = load_settings(path)
+
+        assert s.provider == "moonshot"
+        assert s.api_format == "openai_compat"
+        assert s.auto_compact_threshold_tokens == 54321

@@ -8,6 +8,7 @@ from openharness.services import (
     estimate_conversation_tokens,
     estimate_message_tokens,
     estimate_tokens,
+    get_autocompact_threshold,
     summarize_messages,
 )
 
@@ -34,3 +35,9 @@ def test_compact_and_summarize_messages():
     assert len(compacted) == 3
     assert "[conversation summary]" in compacted[0].text
     assert estimate_conversation_tokens(compacted) >= 1
+
+
+def test_get_autocompact_threshold_respects_override():
+    """显式阈值应覆盖模型默认 auto-compact 计算。"""
+
+    assert get_autocompact_threshold("claude-sonnet-4-20250514", auto_compact_threshold_tokens=12345) == 12345

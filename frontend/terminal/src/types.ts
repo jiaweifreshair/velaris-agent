@@ -23,6 +23,7 @@ export type McpServerSnapshot = {
 	name: string;
 	state: string;
 	detail?: string;
+	detail_level?: string;
 	transport?: string;
 	auth_configured?: boolean;
 	tool_count?: number;

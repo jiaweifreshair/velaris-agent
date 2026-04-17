@@ -18,6 +18,7 @@ async def test_travel_plan_recommends_travel_tool_and_registry_executes(tmp_path
 
     biz_plan = registry.get("biz_plan")
     travel_tool = registry.get("travel_recommend")
+    travel_compare_tool = registry.get("travel_compare")
 
     plan_result = await biz_plan.execute(
         biz_plan.input_model(
@@ -28,6 +29,8 @@ async def test_travel_plan_recommends_travel_tool_and_registry_executes(tmp_path
     )
     plan = json.loads(plan_result.output)
     assert plan["recommended_tools"][1] == "travel_recommend"
+    assert "travel_compare" in plan["recommended_tools"]
+    assert travel_compare_tool is not None
 
     run_result = await travel_tool.execute(
         travel_tool.input_model(
@@ -56,6 +59,7 @@ async def test_travel_plan_recommends_travel_tool_and_registry_executes(tmp_path
     )
     payload = json.loads(run_result.output)
     assert payload["recommended"]["id"] == "travel-a"
+    assert payload["status"] == "requires_confirmation"
 
 
 @pytest.mark.asyncio

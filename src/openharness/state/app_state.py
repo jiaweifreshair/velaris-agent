@@ -25,6 +25,8 @@ class AppState:
     passes: int = 1
     mcp_connected: int = 0
     mcp_failed: int = 0
+    mcp_notice: str = ""
+    mcp_notice_level: str = ""
     bridge_sessions: int = 0
     output_style: str = "default"
     keybindings: dict[str, str] = field(default_factory=dict)

@@ -1,0 +1,219 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 880" width="960" height="880">
+  <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="880" fill="#ffffff"/>
+
+  <text x="480" y="36" text-anchor="middle" fill="#111827" font-size="20" font-weight="600">Velaris Agent — Decision Intelligence Architecture</text>
+  <text x="480" y="56" text-anchor="middle" fill="#6b7280" font-size="13">Context is the moat. Every decision makes the next one better.</text>
+
+  <!-- L0: User Input -->
+  <circle cx="100" cy="92" r="12" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <path d="M 86,128 Q 86,104 100,104 Q 114,104 114,128" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="100" y="148" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">User</text>
+  <rect x="180" y="82" width="140" height="48" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <rect x="180" y="82" width="140" height="18" rx="8" fill="#111827"/>
+  <rect x="180" y="94" width="140" height="6" fill="#111827"/>
+  <circle cx="192" cy="91" r="3.5" fill="#ef4444" opacity="0.8"/>
+  <circle cx="202" cy="91" r="3.5" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="212" cy="91" r="3.5" fill="#10b981" opacity="0.8"/>
+  <text x="250" y="118" text-anchor="middle" fill="#111827" font-size="13" font-weight="500">CLI / TUI</text>
+  <line x1="114" y1="106" x2="178" y2="106" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+
+  <!-- L1: Agent Loop (OpenHarness Engine) -->
+  <rect x="40" y="170" width="880" height="160" rx="8" fill="#eff6ff" fill-opacity="0.3" stroke="#2563eb" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="188" fill="#2563eb" font-size="11" font-weight="600" letter-spacing="0.06em">L1 — AGENT LOOP (OpenHarness Engine)</text>
+  <rect x="60" y="200" width="160" height="52" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="140" y="222" text-anchor="middle" fill="#111827" font-size="14" font-weight="600">Engine</text>
+  <text x="140" y="240" text-anchor="middle" fill="#6b7280" font-size="11">LLM + Tool Orchestration</text>
+  <rect x="250" y="200" width="130" height="52" rx="8" fill="#faf5ff" stroke="#9333ea" stroke-width="1.5"/>
+  <text x="315" y="222" text-anchor="middle" fill="#111827" font-size="14" font-weight="600">Skills</text>
+  <text x="315" y="240" text-anchor="middle" fill="#6b7280" font-size="11">Markdown Injection</text>
+  <rect x="410" y="200" width="130" height="52" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="475" y="222" text-anchor="middle" fill="#111827" font-size="14" font-weight="600">Permissions</text>
+  <text x="475" y="240" text-anchor="middle" fill="#6b7280" font-size="11">3-Mode Access</text>
+  <rect x="570" y="200" width="110" height="52" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="625" y="222" text-anchor="middle" fill="#111827" font-size="14" font-weight="600">Hooks</text>
+  <text x="625" y="240" text-anchor="middle" fill="#6b7280" font-size="11">Lifecycle Events</text>
+  <rect x="710" y="200" width="100" height="52" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="760" y="222" text-anchor="middle" fill="#111827" font-size="14" font-weight="600">MCP</text>
+  <text x="760" y="240" text-anchor="middle" fill="#6b7280" font-size="11">Protocol Bridge</text>
+  <rect x="840" y="200" width="70" height="52" rx="8" fill="#f0fdfa" stroke="#0d9488" stroke-width="1.5"/>
+  <text x="875" y="230" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">Swarm</text>
+  <line x1="250" y1="130" x2="140" y2="198" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+
+  <!-- Skills Hub (new component in L1) -->
+  <rect x="250" y="264" width="130" height="52" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="315" y="286" text-anchor="middle" fill="#111827" font-size="14" font-weight="600">Skills Hub</text>
+  <text x="315" y="304" text-anchor="middle" fill="#6b7280" font-size="11">Discover / Install</text>
+  <!-- Arrow: Skills → Skills Hub -->
+  <line x1="315" y1="252" x2="315" y2="262" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+
+  <!-- External sources: GitHub API -->
+  <rect x="440" y="268" width="100" height="40" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="490" y="286" text-anchor="middle" fill="#111827" font-size="11" font-weight="500">GitHub API</text>
+  <text x="490" y="300" text-anchor="middle" fill="#6b7280" font-size="10">Contents / Tree</text>
+  <!-- Arrow: Skills Hub → GitHub API -->
+  <line x1="380" y1="288" x2="438" y2="288" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+
+  <!-- External sources: Taps -->
+  <rect x="560" y="268" width="80" height="40" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="600" y="286" text-anchor="middle" fill="#111827" font-size="11" font-weight="500">Taps</text>
+  <text x="600" y="300" text-anchor="middle" fill="#6b7280" font-size="10">Custom Repos</text>
+  <!-- Arrow: Skills Hub → Taps -->
+  <line x1="540" y1="288" x2="558" y2="288" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+
+  <!-- Storage: Lock File -->
+  <rect x="680" y="268" width="80" height="40" rx="6" fill="#faf5ff" stroke="#9333ea" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="720" y="286" text-anchor="middle" fill="#111827" font-size="10" font-weight="500">lock.json</text>
+  <text x="720" y="300" text-anchor="middle" fill="#6b7280" font-size="9">Provenance</text>
+  <!-- Arrow: Skills Hub → Lock File -->
+  <line x1="640" y1="290" x2="678" y2="290" stroke="#6b7280" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arrow-gray)"/>
+
+  <!-- Storage: Quarantine Dir -->
+  <rect x="790" y="268" width="90" height="40" rx="6" fill="#faf5ff" stroke="#9333ea" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="835" y="286" text-anchor="middle" fill="#111827" font-size="10" font-weight="500">Quarantine</text>
+  <text x="835" y="300" text-anchor="middle" fill="#6b7280" font-size="9">Isolation + Scan</text>
+  <!-- Arrow: Skills Hub → Quarantine -->
+  <line x1="760" y1="290" x2="788" y2="290" stroke="#6b7280" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arrow-gray)"/>
+
+  <!-- L2: Decision Tools -->
+  <rect x="40" y="355" width="880" height="210" rx="8" fill="#f0fdf4" fill-opacity="0.2" stroke="#059669" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="373" fill="#059669" font-size="11" font-weight="600" letter-spacing="0.06em">L2 — DECISION TOOLS (Velaris Business Layer)</text>
+  <rect x="60" y="385" width="200" height="165" rx="6" fill="#ede9fe" fill-opacity="0.3" stroke="#9333ea" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="70" y="402" fill="#7c3aed" font-size="10" font-weight="600" letter-spacing="0.06em">MEMORY TOOLS</text>
+  <rect x="72" y="412" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="160" y="430" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">recall_preferences</text>
+  <text x="160" y="444" text-anchor="middle" fill="#6b7280" font-size="10">User Preference Recall</text>
+  <rect x="72" y="456" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="160" y="474" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">recall_decisions</text>
+  <text x="160" y="488" text-anchor="middle" fill="#6b7280" font-size="10">Similar History Search</text>
+  <rect x="72" y="500" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="160" y="518" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">save_decision</text>
+  <text x="160" y="532" text-anchor="middle" fill="#6b7280" font-size="10">Full Snapshot Persist</text>
+  <rect x="280" y="385" width="200" height="165" rx="6" fill="#dbeafe" fill-opacity="0.3" stroke="#2563eb" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="290" y="402" fill="#2563eb" font-size="10" font-weight="600" letter-spacing="0.06em">DECISION TOOLS</text>
+  <rect x="292" y="412" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="380" y="430" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">decision_score</text>
+  <text x="380" y="444" text-anchor="middle" fill="#6b7280" font-size="10">Multi-dim Weighted Score</text>
+  <rect x="292" y="456" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="380" y="474" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">lifegoal_decide</text>
+  <text x="380" y="488" text-anchor="middle" fill="#6b7280" font-size="10">Life Goal 6 Domains</text>
+  <rect x="292" y="500" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="380" y="518" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">biz_execute</text>
+  <text x="380" y="532" text-anchor="middle" fill="#6b7280" font-size="10">Full Biz Loop</text>
+  <rect x="500" y="385" width="200" height="165" rx="6" fill="#fff7ed" fill-opacity="0.3" stroke="#ea580c" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="510" y="402" fill="#ea580c" font-size="10" font-weight="600" letter-spacing="0.06em">GOVERNANCE</text>
+  <rect x="512" y="412" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="600" y="430" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">PolicyRouter</text>
+  <text x="600" y="444" text-anchor="middle" fill="#6b7280" font-size="10">Risk-based Routing</text>
+  <rect x="512" y="456" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="600" y="474" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">AuthorityService</text>
+  <text x="600" y="488" text-anchor="middle" fill="#6b7280" font-size="10">Capability Tokens</text>
+  <rect x="512" y="500" width="176" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="600" y="518" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">TaskLedger + Outcome</text>
+  <text x="600" y="532" text-anchor="middle" fill="#6b7280" font-size="10">Audit Trail</text>
+  <rect x="720" y="385" width="190" height="165" rx="6" fill="#f0fdf4" fill-opacity="0.3" stroke="#16a34a" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="730" y="402" fill="#16a34a" font-size="10" font-weight="600" letter-spacing="0.06em">DOMAIN TOOLS</text>
+  <rect x="732" y="412" width="166" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="815" y="430" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">travel_recommend</text>
+  <text x="815" y="444" text-anchor="middle" fill="#6b7280" font-size="10">Budget + Comfort</text>
+  <rect x="732" y="456" width="166" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="815" y="474" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">tokencost_analyze</text>
+  <text x="815" y="488" text-anchor="middle" fill="#6b7280" font-size="10">API Cost Optimization</text>
+  <rect x="732" y="500" width="166" height="38" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="815" y="518" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">robotclaw_dispatch</text>
+  <text x="815" y="532" text-anchor="middle" fill="#6b7280" font-size="10">Dispatch Governance</text>
+  <line x1="140" y1="252" x2="140" y2="353" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <rect x="105" y="330" width="70" height="16" rx="3" fill="#ffffff" opacity="0.95"/>
+  <text x="140" y="341" text-anchor="middle" fill="#6b7280" font-size="10">tool calls</text>
+
+  <!-- L3: Learning Loop -->
+  <rect x="40" y="590" width="440" height="110" rx="8" fill="#faf5ff" fill-opacity="0.2" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="608" fill="#7c3aed" font-size="11" font-weight="600" letter-spacing="0.06em">L3 — LEARNING LOOP</text>
+  <ellipse cx="130" cy="650" rx="50" ry="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <rect x="80" y="650" width="100" height="35" fill="#ede9fe" stroke="none"/>
+  <line x1="80" y1="650" x2="80" y2="685" stroke="#7c3aed" stroke-width="1.5"/>
+  <line x1="180" y1="650" x2="180" y2="685" stroke="#7c3aed" stroke-width="1.5"/>
+  <ellipse cx="130" cy="685" rx="50" ry="14" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="130" y="674" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">DecisionMemory</text>
+  <rect x="220" y="625" width="160" height="52" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="300" y="648" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">PreferenceLearner</text>
+  <text x="300" y="664" text-anchor="middle" fill="#6b7280" font-size="10">Bayesian + Exp Decay</text>
+  <rect x="400" y="625" width="70" height="52" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="435" y="648" text-anchor="middle" fill="#111827" font-size="11" font-weight="500">Self</text>
+  <text x="435" y="662" text-anchor="middle" fill="#111827" font-size="11" font-weight="500">Evolve</text>
+  <path d="M 180,660 L 218,651" stroke="#7c3aed" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)"/>
+  <path d="M 380,651 L 398,651" stroke="#7c3aed" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)"/>
+  <path d="M 300,625 C 300,600 160,600 160,625" stroke="#7c3aed" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#arrow-purple)"/>
+  <rect x="195" y="590" width="70" height="16" rx="3" fill="#ffffff" opacity="0.95"/>
+  <text x="230" y="601" text-anchor="middle" fill="#7c3aed" font-size="10">feedback</text>
+  <line x1="160" y1="550" x2="130" y2="634" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-purple)"/>
+  <rect x="110" y="580" width="50" height="16" rx="3" fill="#ffffff" opacity="0.95"/>
+  <text x="135" y="591" text-anchor="middle" fill="#7c3aed" font-size="10">read/write</text>
+
+  <!-- L4: Data Sources -->
+  <rect x="500" y="590" width="420" height="110" rx="8" fill="#f0fdf4" fill-opacity="0.2" stroke="#059669" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="515" y="608" fill="#059669" font-size="11" font-weight="600" letter-spacing="0.06em">L4 — DATA SOURCES (Pluggable Adapters)</text>
+  <rect x="520" y="625" width="110" height="52" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="575" y="648" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">Inline Data</text>
+  <text x="575" y="664" text-anchor="middle" fill="#6b7280" font-size="10">JSON / Dict</text>
+  <rect x="650" y="625" width="110" height="52" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="705" y="648" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">File Adapter</text>
+  <text x="705" y="664" text-anchor="middle" fill="#6b7280" font-size="10">CSV / YAML</text>
+  <rect x="780" y="625" width="120" height="52" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="840" y="648" text-anchor="middle" fill="#111827" font-size="12" font-weight="500">HTTP Adapter</text>
+  <text x="840" y="664" text-anchor="middle" fill="#6b7280" font-size="10">REST API</text>
+  <line x1="815" y1="550" x2="710" y2="623" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <rect x="730" y="575" width="50" height="16" rx="3" fill="#ffffff" opacity="0.95"/>
+  <text x="755" y="586" text-anchor="middle" fill="#059669" font-size="10">query</text>
+
+  <!-- Config -->
+  <path d="M 530,730 L 618,730 L 630,742 L 630,790 L 530,790 Z" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <path d="M 618,730 L 618,742 L 630,742" fill="#fed7aa" stroke="#ea580c" stroke-width="1"/>
+  <text x="580" y="760" text-anchor="middle" fill="#111827" font-size="11" font-weight="500">routing-</text>
+  <text x="580" y="774" text-anchor="middle" fill="#111827" font-size="11" font-weight="500">policy.yaml</text>
+  <line x1="600" y1="550" x2="580" y2="728" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-orange)"/>
+  <rect x="565" y="630" width="50" height="16" rx="3" fill="#ffffff" opacity="0.95"/>
+  <text x="590" y="641" text-anchor="middle" fill="#ea580c" font-size="10">config</text>
+
+  <!-- Data Flywheel -->
+  <rect x="40" y="725" width="440" height="80" rx="8" fill="#fef2f2" fill-opacity="0.15" stroke="#dc2626" stroke-width="1" stroke-dasharray="6,4"/>
+  <text x="55" y="743" fill="#dc2626" font-size="11" font-weight="600" letter-spacing="0.06em">DATA FLYWHEEL</text>
+  <text x="260" y="770" text-anchor="middle" fill="#374151" font-size="12">Use → Record → Learn → Update Weights → Better Recommendations → More Use</text>
+  <text x="260" y="790" text-anchor="middle" fill="#6b7280" font-size="11">DecisionRecord: intent + options + scores + weights + choice + satisfaction</text>
+
+  <!-- Legend -->
+  <rect x="660" y="730" width="260" height="80" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <text x="675" y="748" fill="#111827" font-size="12" font-weight="600">Legend</text>
+  <line x1="675" y1="760" x2="705" y2="760" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="715" y="764" fill="#6b7280" font-size="11">Data flow</text>
+  <line x1="675" y1="776" x2="705" y2="776" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-purple)"/>
+  <text x="715" y="780" fill="#6b7280" font-size="11">Memory read/write</text>
+  <line x1="675" y1="792" x2="705" y2="792" stroke="#ea580c" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-orange)"/>
+  <text x="715" y="796" fill="#6b7280" font-size="11">Config / Control</text>
+  <line x1="810" y1="760" x2="840" y2="760" stroke="#059669" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="850" y="764" fill="#6b7280" font-size="11">Query</text>
+
+  <text x="480" y="840" text-anchor="middle" fill="#9ca3af" font-size="10">src/openharness/ → Agent Runtime, Tools, Skills, Skills Hub, Permissions, Hooks, MCP, Swarm</text>
+  <text x="480" y="856" text-anchor="middle" fill="#9ca3af" font-size="10">src/velaris_agent/ → biz/engine.py, velaris/router+authority+ledger, memory/decision+preference, adapters/</text>
+  <text x="480" y="872" text-anchor="middle" fill="#9ca3af" font-size="10">config/routing-policy.yaml → Governance Rules | tests/ → Pytest Suite</text>
+</svg>

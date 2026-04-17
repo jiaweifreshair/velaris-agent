@@ -24,7 +24,10 @@ from openharness.engine.stream_events import (
     ToolExecutionStarted,
 )
 from openharness.tasks import get_task_manager
+from openharness.ui.mcp_notice import format_mcp_notice_markup, format_mcp_server_panel_markup
 from openharness.ui.runtime import build_runtime, close_runtime, handle_line, start_runtime
+
+
 
 
 @dataclass(frozen=True)
@@ -392,6 +395,8 @@ class OpenHarnessTerminalApp(App[None]):
             f"tokens: {usage.total_tokens}",
             f"messages: {len(self._bundle.engine.messages)}",
         ]
+        if state.mcp_notice:
+            status_lines.append(format_mcp_notice_markup(state.mcp_notice, state.mcp_notice_level))
         self.query_one("#status-bar", Static).update("\n".join(status_lines))
 
         tasks = get_task_manager().list_tasks()
@@ -408,4 +413,4 @@ class OpenHarnessTerminalApp(App[None]):
         else:
             task_lines = ["[b]Tasks[/b]", "No background tasks."]
         self.query_one("#tasks-panel", Static).update("\n".join(task_lines))
-        self.query_one("#mcp-panel", Static).update(self._bundle.mcp_summary())
+        self.query_one("#mcp-panel", Static).update(format_mcp_server_panel_markup(self._bundle.mcp_manager.list_statuses()))

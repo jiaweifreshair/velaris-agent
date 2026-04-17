@@ -35,6 +35,12 @@ coverage.xml
 # Build artifacts
 *.tsbuildinfo
 .turbo/
+build/
+
+# Private planning docs
+/private-docs/
+/build/private-docs/
+docs/SMART-TRAVEL-CONCIERGE-PRD.md
 
 # Package managers
 node_modules/

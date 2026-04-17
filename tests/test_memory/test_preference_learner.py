@@ -197,3 +197,189 @@ def test_weights_sum_to_one(tmp_path: Path):
     prefs = learner.compute_preferences("u1", "travel")
     total = sum(prefs.weights.values())
     assert total == pytest.approx(1.0, abs=0.01), f"权重总和 {total} != 1.0"
+
+
+# ---------------------------------------------------------------------------
+# Backward compatibility tests (Req 9.3, 9.5)
+# Task 10.2: Verify PreferenceLearner.compute_alignment() backward compat
+# ---------------------------------------------------------------------------
+
+
+class TestComputeAlignmentBackwardCompatibility:
+    """Verify compute_alignment(user_id, org_policy) two-parameter signature
+    still returns a valid AlignmentReport with all fields populated.
+
+    Requirements: 9.3
+    """
+
+    def test_two_param_signature_returns_alignment_report(
+        self, tmp_path: Path
+    ) -> None:
+        """compute_alignment(user_id, org_policy) returns AlignmentReport."""
+        from velaris_agent.memory.types import AlignmentReport, OrgPolicy
+
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+        learner = PreferenceLearner(mem)
+
+        org_policy = OrgPolicy(
+            org_id="acme",
+            scenario="travel",
+            weights={"price": 0.3, "time": 0.4, "comfort": 0.3},
+        )
+
+        report = learner.compute_alignment("user-1", org_policy)
+
+        assert isinstance(report, AlignmentReport)
+
+    def test_all_fields_populated(self, tmp_path: Path) -> None:
+        """AlignmentReport has all required fields populated."""
+        from velaris_agent.memory.types import AlignmentReport, OrgPolicy
+
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+        learner = PreferenceLearner(mem)
+
+        org_policy = OrgPolicy(
+            org_id="acme",
+            scenario="travel",
+            weights={"price": 0.3, "time": 0.4, "comfort": 0.3},
+        )
+
+        report = learner.compute_alignment("user-1", org_policy)
+
+        # All AlignmentReport fields must be present and valid
+        assert report.user_id == "user-1"
+        assert report.org_id == "acme"
+        assert report.scenario == "travel"
+        assert 0.0 <= report.alignment_score <= 1.0
+        assert isinstance(report.conflicts, list)
+        assert isinstance(report.synergies, list)
+        assert isinstance(report.negotiation_space, dict)
+        assert report.created_at is not None
+
+    def test_with_user_history(self, tmp_path: Path) -> None:
+        """compute_alignment works correctly when user has decision history."""
+        from velaris_agent.memory.types import AlignmentReport, OrgPolicy
+
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+        learner = PreferenceLearner(mem)
+
+        # Add some decision history
+        for i in range(5):
+            rec = _make_record(
+                decision_id=f"dec-{i:03d}",
+                recommended_id="opt-a",
+                chosen_id="opt-b",
+                feedback=4.0,
+            )
+            mem.save(rec)
+
+        org_policy = OrgPolicy(
+            org_id="corp",
+            scenario="travel",
+            weights={"price": 0.6, "time": 0.2, "comfort": 0.2},
+        )
+
+        report = learner.compute_alignment("u1", org_policy)
+
+        assert isinstance(report, AlignmentReport)
+        assert report.user_id == "u1"
+        assert report.org_id == "corp"
+        assert 0.0 <= report.alignment_score <= 1.0
+
+    def test_conflicts_and_synergies_structure(self, tmp_path: Path) -> None:
+        """Conflicts contain dimension/user_weight/org_weight/gap keys."""
+        from velaris_agent.memory.types import OrgPolicy
+
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+        learner = PreferenceLearner(mem)
+
+        # Use weights that differ significantly from defaults to force conflicts
+        org_policy = OrgPolicy(
+            org_id="strict-org",
+            scenario="travel",
+            weights={"price": 0.9, "time": 0.05, "comfort": 0.05},
+        )
+
+        report = learner.compute_alignment("new-user", org_policy)
+
+        for conflict in report.conflicts:
+            assert "dimension" in conflict
+            assert "user_weight" in conflict
+            assert "org_weight" in conflict
+            assert "gap" in conflict
+
+
+class TestDecisionRecordWithoutStakeholderContext:
+    """Verify old DecisionRecords without stakeholder_context in env_snapshot
+    load without error.
+
+    Requirements: 9.5
+    """
+
+    def test_empty_env_snapshot_loads(self, tmp_path: Path) -> None:
+        """DecisionRecord with empty env_snapshot loads without error."""
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+
+        record = DecisionRecord(
+            decision_id="dec-old-001",
+            user_id="u1",
+            scenario="travel",
+            query="old query",
+            env_snapshot={},
+            created_at=datetime.now(timezone.utc),
+        )
+        mem.save(record)
+
+        loaded = mem.get("dec-old-001")
+        assert loaded is not None
+        assert loaded.env_snapshot.get("stakeholder_context") is None
+
+    def test_env_snapshot_without_stakeholder_context_loads(
+        self, tmp_path: Path
+    ) -> None:
+        """DecisionRecord with env_snapshot lacking stakeholder_context loads."""
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+
+        record = DecisionRecord(
+            decision_id="dec-old-002",
+            user_id="u1",
+            scenario="travel",
+            query="old query with env",
+            env_snapshot={"market_trend": "up", "season": "peak"},
+            created_at=datetime.now(timezone.utc),
+        )
+        mem.save(record)
+
+        loaded = mem.get("dec-old-002")
+        assert loaded is not None
+        assert loaded.env_snapshot.get("stakeholder_context") is None
+        assert loaded.env_snapshot["market_trend"] == "up"
+        assert loaded.env_snapshot["season"] == "peak"
+
+    def test_env_snapshot_with_stakeholder_context_loads(
+        self, tmp_path: Path
+    ) -> None:
+        """DecisionRecord with stakeholder_context in env_snapshot also loads."""
+        mem = DecisionMemory(base_dir=tmp_path / "decisions")
+
+        record = DecisionRecord(
+            decision_id="dec-new-001",
+            user_id="u1",
+            scenario="travel",
+            query="new query",
+            env_snapshot={
+                "market_trend": "up",
+                "stakeholder_context": {
+                    "scenario": "travel",
+                    "stakeholder_ids": ["user-1", "org-1"],
+                },
+            },
+            created_at=datetime.now(timezone.utc),
+        )
+        mem.save(record)
+
+        loaded = mem.get("dec-new-001")
+        assert loaded is not None
+        ctx = loaded.env_snapshot.get("stakeholder_context")
+        assert ctx is not None
+        assert ctx["scenario"] == "travel"

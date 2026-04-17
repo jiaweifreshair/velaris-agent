@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from openharness.api.registry import infer_provider_spec, resolve_api_key_from_env
 from openharness.hooks.schemas import HookDefinition
 from openharness.mcp.types import McpServerConfig
 from openharness.permissions.modes import PermissionMode
@@ -70,14 +71,30 @@ class SecuritySettings(BaseModel):
     redact_secrets: bool = True
 
 
+class StorageSettings(BaseModel):
+    """存储后端配置。
+
+    这组配置只负责描述 PostgreSQL bootstrap 所需的连接与调度参数，
+    便于后续任务在不引入额外基础设施的前提下复用同一份设置。
+    """
+
+    postgres_dsn: str = ""
+    evidence_dir: str | None = None
+    job_poll_interval_seconds: float = 2.0
+    job_max_attempts: int = 3
+
+
 class Settings(BaseModel):
     """Main settings model for OpenHarness."""
 
     # API configuration
     api_key: str = ""
+    api_format: Literal["anthropic", "openai_compat"] = "anthropic"
+    provider: str | None = None
     model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 16384
     base_url: str | None = None
+    auto_compact_threshold_tokens: int | None = None
 
     # Behavior
     system_prompt: str | None = None
@@ -86,6 +103,7 @@ class Settings(BaseModel):
     memory: MemorySettings = Field(default_factory=MemorySettings)
     skills: SkillsSettings = Field(default_factory=SkillsSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
     enabled_plugins: dict[str, bool] = Field(default_factory=dict)
     mcp_servers: dict[str, McpServerConfig] = Field(default_factory=dict)
 
@@ -107,12 +125,19 @@ class Settings(BaseModel):
         if self.api_key:
             return self.api_key
 
-        env_key = os.environ.get("VELARIS_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")
+        env_key = resolve_api_key_from_env(
+            provider_name=self.provider,
+            model=self.model,
+            base_url=self.base_url,
+            api_key=self.api_key,
+            api_format=self.api_format,
+        )
         if env_key:
             return env_key
 
         raise ValueError(
-            "No API key found. Set VELARIS_API_KEY or ANTHROPIC_API_KEY, "
+            "No API key found. Set VELARIS_API_KEY, provider-specific API key "
+            "(for example ANTHROPIC_API_KEY / OPENAI_API_KEY / MOONSHOT_API_KEY), "
             "or configure api_key in ~/.velaris-agent/settings.json"
         )
 
@@ -125,6 +150,15 @@ class Settings(BaseModel):
 def _apply_env_overrides(settings: Settings) -> Settings:
     """Apply supported environment variable overrides over loaded settings."""
     updates: dict[str, Any] = {}
+    storage_updates: dict[str, Any] = {}
+    provider = os.environ.get("VELARIS_PROVIDER") or os.environ.get("OPENHARNESS_PROVIDER")
+    if provider:
+        updates["provider"] = provider
+
+    api_format = os.environ.get("VELARIS_API_FORMAT") or os.environ.get("OPENHARNESS_API_FORMAT")
+    if api_format:
+        updates["api_format"] = api_format
+
     model = (
         os.environ.get("ANTHROPIC_MODEL")
         or os.environ.get("VELARIS_MODEL")
@@ -133,10 +167,22 @@ def _apply_env_overrides(settings: Settings) -> Settings:
     if model:
         updates["model"] = model
 
+    candidate = settings.model_copy(update=updates) if updates else settings
+    provider_spec = infer_provider_spec(
+        provider_name=candidate.provider,
+        model=candidate.model,
+        base_url=candidate.base_url,
+        api_key=candidate.api_key,
+        api_format=candidate.api_format,
+    )
     base_url = (
-        os.environ.get("ANTHROPIC_BASE_URL")
-        or os.environ.get("VELARIS_BASE_URL")
+        os.environ.get("VELARIS_BASE_URL")
         or os.environ.get("OPENHARNESS_BASE_URL")
+        or (
+            os.environ.get("ANTHROPIC_BASE_URL")
+            if provider_spec.name == "anthropic"
+            else ""
+        )
     )
     if base_url:
         updates["base_url"] = base_url
@@ -145,7 +191,32 @@ def _apply_env_overrides(settings: Settings) -> Settings:
     if max_tokens:
         updates["max_tokens"] = int(max_tokens)
 
-    api_key = os.environ.get("VELARIS_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+    auto_compact_threshold_tokens = (
+        os.environ.get("VELARIS_AUTO_COMPACT_THRESHOLD_TOKENS")
+        or os.environ.get("OPENHARNESS_AUTO_COMPACT_THRESHOLD_TOKENS")
+    )
+    if auto_compact_threshold_tokens:
+        updates["auto_compact_threshold_tokens"] = int(auto_compact_threshold_tokens)
+
+    postgres_dsn = os.environ.get("VELARIS_POSTGRES_DSN")
+    if postgres_dsn:
+        storage_updates["postgres_dsn"] = postgres_dsn
+
+    evidence_dir = os.environ.get("VELARIS_EVIDENCE_DIR")
+    if evidence_dir:
+        storage_updates["evidence_dir"] = evidence_dir
+
+    if storage_updates:
+        updates["storage"] = settings.storage.model_copy(update=storage_updates)
+
+    candidate = settings.model_copy(update=updates) if updates else settings
+    api_key = resolve_api_key_from_env(
+        provider_name=candidate.provider,
+        model=candidate.model,
+        base_url=candidate.base_url,
+        api_key=candidate.api_key,
+        api_format=candidate.api_format,
+    )
     if api_key:
         updates["api_key"] = api_key
 

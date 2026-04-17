@@ -26,6 +26,46 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def serialize_decision_record(record: DecisionRecord) -> dict[str, Any]:
+    """把决策记录转换成可序列化的统一 payload。
+
+    这样文件后端和 PostgreSQL 后端都可以复用同一份序列化格式，
+    避免不同存储介质之间出现字段漂移。
+    """
+
+    return record.model_dump(mode="json")
+
+
+def deserialize_decision_record(payload: dict[str, Any]) -> DecisionRecord:
+    """把统一 payload 还原成决策记录对象。"""
+
+    return DecisionRecord.model_validate(payload)
+
+
+def build_decision_index_entry(record: DecisionRecord) -> dict[str, Any]:
+    """为最近优先扫描构建轻量索引项。
+
+    文件后端会把它追加到 `index.jsonl`，PostgreSQL 后端则直接从 payload
+    重建同样的索引结构，以便复用相同的检索语义。
+    """
+
+    return {
+        "decision_id": record.decision_id,
+        "user_id": record.user_id,
+        "scenario": record.scenario,
+        "query": record.query[:200],
+        "recommended_id": record.recommended.get("id", ""),
+        "user_choice_id": record.user_choice.get("id", "") if record.user_choice else None,
+        "user_feedback": record.user_feedback,
+        "created_at": record.created_at.isoformat(),
+    }
+
+
+_record_payload = serialize_decision_record
+_record_from_payload = deserialize_decision_record
+_build_index_entry = build_decision_index_entry
+
+
 class DecisionMemory:
     """决策记忆 - 存储、检索、反馈闭环。
 
@@ -55,22 +95,18 @@ class DecisionMemory:
         # 写完整记录
         record_path = self._records_dir / f"{record.decision_id}.json"
         record_path.write_text(
-            record.model_dump_json(indent=2), encoding="utf-8"
+            json.dumps(serialize_decision_record(record), ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
 
-        # 追加索引 (轻量摘要, 用于快速扫描)
-        index_entry = {
-            "decision_id": record.decision_id,
-            "user_id": record.user_id,
-            "scenario": record.scenario,
-            "query": record.query[:200],
-            "recommended_id": record.recommended.get("id", ""),
-            "user_choice_id": record.user_choice.get("id", "") if record.user_choice else None,
-            "user_feedback": record.user_feedback,
-            "created_at": record.created_at.isoformat(),
-        }
-        with self._index_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(index_entry, ensure_ascii=False) + "\n")
+        # 索引去重后再追加，确保同一 decision_id 重复保存时只保留最近一次
+        index_entries = [
+            entry
+            for entry in self._load_index_entries()
+            if entry.get("decision_id") != record.decision_id
+        ]
+        index_entries.append(build_decision_index_entry(record))
+        self._write_index_entries(index_entries)
 
         return record.decision_id
 
@@ -80,7 +116,7 @@ class DecisionMemory:
         if not record_path.exists():
             return None
         data = json.loads(record_path.read_text(encoding="utf-8"))
-        return DecisionRecord.model_validate(data)
+        return deserialize_decision_record(data)
 
     def update_feedback(
         self,
@@ -235,11 +271,15 @@ class DecisionMemory:
 
     def _scan_index_reversed(self) -> list[dict[str, Any]]:
         """逆序扫描索引 (最近优先)。"""
+        return list(reversed(self._load_index_entries()))
+
+    def _load_index_entries(self) -> list[dict[str, Any]]:
+        """读取索引文件并过滤掉损坏的行。"""
+
         if not self._index_path.exists():
             return []
-        lines = self._index_path.read_text(encoding="utf-8").strip().split("\n")
         entries: list[dict[str, Any]] = []
-        for line in reversed(lines):
+        for line in self._index_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
@@ -248,6 +288,14 @@ class DecisionMemory:
             except json.JSONDecodeError:
                 continue
         return entries
+
+    def _write_index_entries(self, entries: list[dict[str, Any]]) -> None:
+        """把索引覆盖写回文件，保持追加顺序语义稳定。"""
+
+        payload = "\n".join(json.dumps(entry, ensure_ascii=False) for entry in entries)
+        if payload:
+            payload += "\n"
+        self._index_path.write_text(payload, encoding="utf-8")
 
     @staticmethod
     def generate_id() -> str:

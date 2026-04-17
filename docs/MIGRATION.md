@@ -38,6 +38,50 @@
 - 新增 `src/velaris_agent/` 下的原生命名空间实现，`openharness.*` 保留兼容导出。
 - 三类领域工具新增 `file/http` 数据源 adapter，支持从外部结构化数据直接装配业务负载。
 
+6. MCP 兼容与运行时状态
+- MCP transport 已对齐到当前 OpenHarness 兼容面：支持 `stdio / http / ws`。
+- 交互会话里支持 `/mcp auth ...` 热更新当前活跃 server 配置，并优先尝试单 server 自动重连。
+- UI 状态已补齐 `mcp_notice` / `mcp_notice_level`，React Terminal 与 Textual 都能区分恢复、失败、普通提示。
+- `mcp_servers[*]` 快照已包含 `detail_level`，前端可以对单个 server 的详情精确着色。
+- 纯文本 `/mcp` 摘要也已更新为紧凑格式，便于在 CLI、日志和文档中统一呈现。
+
+### 当前 MCP 迁移结果
+
+推荐的本地验证命令：
+
+```bash
+uv run velaris mcp add remote-http '{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer <token>"}}'
+uv run velaris mcp add remote-ws '{"type":"ws","url":"wss://example.com/mcp","headers":{"Authorization":"Bearer <token>"}}'
+uv run velaris
+```
+
+会话内常用命令：
+
+```text
+/mcp
+/mcp auth remote-http bearer <token>
+/mcp auth remote-ws bearer <token>
+/mcp auth remote-ws header X-API-Key <token>
+```
+
+当前纯文本 MCP 摘要格式：
+
+```text
+MCP servers:
+- remote-http [connected] http
+  auth=True tools=2 resources=1
+  tool_names: search_docs, read_page
+  resource_uris: docs://index
+- remote-ws [connected] ws
+  auth=True tools=3 resources=1
+  mcp recovered: Auto-reconnect recovered after transport closed
+  tool_names: search_flights, search_hotels, get_weather
+  resource_uris: travel://guide
+- local-files [failed] stdio
+  auth=False tools=0 resources=0
+  mcp error: broken pipe
+```
+
 ## 下一步建议
 
 1. 第二轮做深度场景化

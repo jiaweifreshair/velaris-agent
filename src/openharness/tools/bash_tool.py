@@ -32,6 +32,21 @@ class BashTool(BaseTool):
     description = "Run a shell command in the local repository."
     input_model = BashToolInput
 
+    @staticmethod
+    def _build_shell_command(command: str) -> str:
+        """构造带有 `python -> python3` 兼容层的 shell 命令。
+
+        这个方法只在系统缺少 `python` 但存在 `python3` 时，在当前 shell
+        进程里声明一个同名函数，避免历史脚本和测试因为命令名差异直接失败。
+        """
+
+        compatibility_prefix = (
+            'if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then '
+            'python(){ command python3 "$@"; }; '
+            "fi; "
+        )
+        return f"{compatibility_prefix}{command}"
+
     async def execute(  # type: ignore[override]
         self,
         arguments: BashToolInput,
@@ -58,7 +73,7 @@ class BashTool(BaseTool):
         process = await asyncio.create_subprocess_exec(
             "/bin/bash",
             "-lc",
-            arguments.command,
+            self._build_shell_command(arguments.command),
             cwd=str(cwd),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

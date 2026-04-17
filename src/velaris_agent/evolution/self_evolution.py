@@ -18,10 +18,68 @@ from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.memory.preference_learner import PreferenceLearner
 from velaris_agent.memory.types import DecisionRecord
 
+SELF_EVOLUTION_REVIEW_JOB_TYPE = "self_evolution_review"
+
 
 def _now() -> datetime:
     """返回 UTC 当前时间，保持报告时间统一。"""
     return datetime.now(timezone.utc)
+
+
+def build_self_evolution_review_job_payload(
+    *,
+    user_id: str,
+    scenario: str,
+    window: int,
+    persist_report: bool,
+    report_dir: str | Path | None = None,
+    decision_memory_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """构造 self_evolution_review 队列任务 payload。
+
+    payload 只保留 worker 执行所需的最小字段，避免把整个上下文对象塞进队列。
+    """
+
+    payload: dict[str, Any] = {
+        "user_id": user_id,
+        "scenario": scenario,
+        "window": window,
+        "persist_report": persist_report,
+    }
+    if report_dir is not None:
+        payload["report_dir"] = str(report_dir)
+    if decision_memory_dir is not None:
+        payload["decision_memory_dir"] = str(decision_memory_dir)
+    return payload
+
+
+def run_self_evolution_review_job(
+    *,
+    postgres_dsn: str,
+    payload: dict[str, Any],
+) -> SelfEvolutionReport:
+    """执行一条 self_evolution_review 队列任务。
+
+    worker 入口统一从 payload 中恢复最小参数，
+    并复用现有 `SelfEvolutionEngine.review()` 逻辑，避免重复实现统计规则。
+    """
+
+    from velaris_agent.persistence.factory import build_decision_memory
+
+    memory = build_decision_memory(
+        postgres_dsn=postgres_dsn,
+        base_dir=payload.get("decision_memory_dir"),
+    )
+    engine = SelfEvolutionEngine(
+        memory=memory,
+        report_dir=payload.get("report_dir"),
+    )
+    return engine.review(
+        user_id=str(payload["user_id"]),
+        scenario=str(payload["scenario"]),
+        window=max(3, int(payload.get("window", 20))),
+        persist_report=bool(payload.get("persist_report", True)),
+    )
 
 
 class SelfEvolutionEngine:

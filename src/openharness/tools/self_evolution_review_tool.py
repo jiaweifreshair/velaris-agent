@@ -38,11 +38,15 @@ class SelfEvolutionReviewTool(BaseTool):
         """执行自进化复盘。"""
         try:
             from velaris_agent.evolution.self_evolution import SelfEvolutionEngine
-            from velaris_agent.memory.decision_memory import DecisionMemory
+            from velaris_agent.persistence.factory import build_decision_memory
 
             memory_dir = context.metadata.get("decision_memory_dir")
             report_dir = context.metadata.get("evolution_report_dir")
-            memory = DecisionMemory(base_dir=memory_dir)
+            postgres_dsn = context.metadata.get("postgres_dsn", "")
+            memory = build_decision_memory(
+                postgres_dsn=postgres_dsn,
+                base_dir=memory_dir,
+            )
             engine = SelfEvolutionEngine(memory=memory, report_dir=report_dir)
 
             report = engine.review(

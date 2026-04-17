@@ -16,6 +16,14 @@ from openharness.tools.task_update_tool import TaskUpdateTool, TaskUpdateToolInp
 from openharness.tools.team_create_tool import TeamCreateTool, TeamCreateToolInput
 
 
+async def _drain_task(manager, task_id: str) -> None:
+    """等待后台任务收口，避免测试结束时残留 subprocess transport。"""
+
+    waiter = manager._waiters.get(task_id)  # type: ignore[attr-defined]
+    if waiter is not None:
+        await asyncio.wait_for(waiter, timeout=5)
+
+
 @pytest.mark.asyncio
 async def test_task_create_and_output_tool(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("OPENHARNESS_DATA_DIR", str(tmp_path / "data"))
@@ -42,6 +50,7 @@ async def test_task_create_and_output_tool(tmp_path: Path, monkeypatch):
         context,
     )
     assert "tool task" in output_result.output
+    await _drain_task(manager, task_id)
 
 
 @pytest.mark.asyncio
@@ -85,6 +94,7 @@ async def test_task_update_tool_updates_metadata(tmp_path: Path, monkeypatch):
     assert task.description == "renamed task"
     assert task.metadata["progress"] == "60"
     assert task.metadata["status_note"] == "waiting on verification"
+    await _drain_task(get_task_manager(), task_id)
 
 
 @pytest.mark.asyncio
@@ -115,3 +125,7 @@ async def test_agent_tool_supports_remote_and_teammate_modes(tmp_path: Path, mon
     assert m is not None, f"Could not extract task_id from: {result.output}"
     assert len(m.group(1)) > 0
     assert "backend=" in result.output
+    task = get_task_manager().get_task(m.group(1))
+    if task is not None:
+        await get_task_manager().stop_task(m.group(1))
+        await _drain_task(get_task_manager(), m.group(1))

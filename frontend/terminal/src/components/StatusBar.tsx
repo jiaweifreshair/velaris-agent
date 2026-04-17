@@ -1,6 +1,7 @@
 import React from 'react';
 import {Box, Text} from 'ink';
 
+import {describeMcpNotice} from './mcpNotice.js';
 import type {TaskSnapshot} from '../types.js';
 
 const SEP = ' \u2502 ';
@@ -10,6 +11,7 @@ export function StatusBar({status, tasks}: {status: Record<string, unknown>; tas
 	const mode = String(status.permission_mode ?? 'default');
 	const taskCount = tasks.length;
 	const mcpCount = Number(status.mcp_connected ?? 0);
+	const mcpNotice = describeMcpNotice(status.mcp_notice, status.mcp_notice_level);
 	const inputTokens = Number(status.input_tokens ?? 0);
 	const outputTokens = Number(status.output_tokens ?? 0);
 
@@ -41,6 +43,13 @@ export function StatusBar({status, tasks}: {status: Record<string, unknown>; tas
 					) : null}
 				</Text>
 			</Box>
+			{mcpNotice ? (
+				<Box>
+					<Text color={mcpNotice.color}>
+						{mcpNotice.label}: {mcpNotice.message}
+					</Text>
+				</Box>
+			) : null}
 		</Box>
 	);
 }

@@ -10,6 +10,7 @@ from openharness.state.app_state import AppState
 from openharness.bridge.manager import BridgeSessionRecord
 from openharness.mcp.types import McpConnectionStatus
 from openharness.tasks.types import TaskRecord
+from openharness.ui.mcp_notice import infer_mcp_notice_level
 
 
 class FrontendRequest(BaseModel):
@@ -128,6 +129,7 @@ class BackendEvent(BaseModel):
                     "name": server.name,
                     "state": server.state,
                     "detail": server.detail,
+                    "detail_level": infer_mcp_notice_level(server.state, server.detail) if server.detail else "",
                     "transport": server.transport,
                     "auth_configured": server.auth_configured,
                     "tool_count": len(server.tools),
@@ -168,6 +170,8 @@ def _state_payload(state: AppState) -> dict[str, Any]:
         "passes": state.passes,
         "mcp_connected": state.mcp_connected,
         "mcp_failed": state.mcp_failed,
+        "mcp_notice": state.mcp_notice,
+        "mcp_notice_level": state.mcp_notice_level,
         "bridge_sessions": state.bridge_sessions,
         "output_style": state.output_style,
         "keybindings": dict(state.keybindings),

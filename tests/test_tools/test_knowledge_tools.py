@@ -162,3 +162,118 @@ async def test_self_evolution_review_tool_and_save_trigger(tmp_path: Path) -> No
     )
     second = json.loads(save_result_2.output)
     assert second["self_evolution"]["triggered"] is True
+    assert second["self_evolution"]["queued"] is False
+
+
+@pytest.mark.asyncio
+async def test_save_decision_queues_self_evolution_when_postgres_enabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """启用 PostgreSQL 且命中 review interval 时，应入队而不是同步执行自进化。"""
+
+    context = ToolExecutionContext(
+        cwd=tmp_path,
+        metadata={
+            "decision_memory_dir": str(tmp_path / "decisions"),
+            "knowledge_base_dir": str(tmp_path / "knowledge"),
+            "evolution_report_dir": str(tmp_path / "evolution-reports"),
+            "evolution_review_interval": 2,
+            "postgres_dsn": "postgresql://user:pass@localhost:5432/velaris",
+        },
+    )
+    memory = DecisionMemory(base_dir=tmp_path / "decisions")
+    queued_calls: list[dict[str, object]] = []
+
+    class _FakeQueue:
+        """记录入队参数的伪队列。"""
+
+        def enqueue(
+            self,
+            job_type: str,
+            idempotency_key: str,
+            payload: dict[str, object],
+        ) -> str:
+            """记录一次 enqueue 调用，并返回稳定的 job_id。"""
+
+            queued_calls.append(
+                {
+                    "job_type": job_type,
+                    "idempotency_key": idempotency_key,
+                    "payload": dict(payload),
+                }
+            )
+            return "job-self-evo-001"
+
+    def fake_build_decision_memory(postgres_dsn: str = "", base_dir: str | Path | None = None):
+        """复用文件后端，避免测试依赖真实 PostgreSQL。"""
+
+        assert postgres_dsn == "postgresql://user:pass@localhost:5432/velaris"
+        assert base_dir == str(tmp_path / "decisions")
+        return memory
+
+    def fake_build_job_queue(postgres_dsn: str = "") -> _FakeQueue | None:
+        """在传入 PostgreSQL DSN 时返回伪队列。"""
+
+        assert postgres_dsn == "postgresql://user:pass@localhost:5432/velaris"
+        return _FakeQueue()
+
+    def fail_review(*args, **kwargs):
+        """若同步 review 被调用，直接让测试失败。"""
+
+        raise AssertionError("save_decision 不应在启用队列时同步执行 SelfEvolutionEngine.review")
+
+    monkeypatch.setattr(
+        "velaris_agent.persistence.factory.build_decision_memory",
+        fake_build_decision_memory,
+    )
+    monkeypatch.setattr(
+        "velaris_agent.persistence.factory.build_job_queue",
+        fake_build_job_queue,
+    )
+    monkeypatch.setattr(
+        "velaris_agent.evolution.self_evolution.SelfEvolutionEngine.review",
+        fail_review,
+    )
+
+    tool = SaveDecisionTool()
+    first = json.loads(
+        (
+            await tool.execute(
+                SaveDecisionInput(
+                    user_id="u-save",
+                    scenario="travel",
+                    query="机票方案选择",
+                    recommended={"id": "cheap", "label": "便宜方案"},
+                    alternatives=[{"id": "fast", "label": "快速方案"}],
+                    options_discovered=[{"id": "cheap"}, {"id": "fast"}],
+                    weights_used={"price": 0.6, "comfort": 0.4},
+                    explanation="预算优先",
+                ),
+                context,
+            )
+        ).output
+    )
+    assert first["self_evolution"]["triggered"] is False
+    assert first["self_evolution"]["queued"] is False
+
+    second_result = await tool.execute(
+        SaveDecisionInput(
+            user_id="u-save",
+            scenario="travel",
+            query="高铁方案选择",
+            recommended={"id": "cheap", "label": "便宜方案"},
+            alternatives=[{"id": "fast", "label": "快速方案"}],
+            options_discovered=[{"id": "cheap"}, {"id": "fast"}],
+            weights_used={"price": 0.6, "comfort": 0.4},
+            explanation="预算优先",
+        ),
+        context,
+    )
+    assert second_result.is_error is False
+
+    second = json.loads(second_result.output)
+    assert second["self_evolution"]["triggered"] is False
+    assert second["self_evolution"]["queued"] is True
+    assert second["self_evolution"]["job_id"] == "job-self-evo-001"
+    assert queued_calls and queued_calls[0]["job_type"] == "self_evolution_review"

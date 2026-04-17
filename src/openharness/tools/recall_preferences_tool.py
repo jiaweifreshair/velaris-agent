@@ -43,13 +43,15 @@ class RecallPreferencesTool(BaseTool):
     ) -> ToolResult:
         """执行偏好召回。"""
         try:
-            # 懒导入, 避免循环依赖
-            from velaris_agent.memory.decision_memory import DecisionMemory
             from velaris_agent.memory.preference_learner import PreferenceLearner
+            from velaris_agent.persistence.factory import build_decision_memory
 
-            # 从上下文获取存储目录, 支持自定义路径
             base_dir = context.metadata.get("decision_memory_dir")
-            memory = DecisionMemory(base_dir=base_dir)
+            postgres_dsn = context.metadata.get("postgres_dsn", "")
+            memory = build_decision_memory(
+                postgres_dsn=postgres_dsn,
+                base_dir=base_dir,
+            )
             learner = PreferenceLearner(memory)
 
             prefs = learner.compute_preferences(arguments.user_id, arguments.scenario)

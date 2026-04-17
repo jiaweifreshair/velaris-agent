@@ -41,6 +41,7 @@ class QueryEngine:
         model: str,
         system_prompt: str,
         max_tokens: int = 4096,
+        auto_compact_threshold_tokens: int | None = None,
         permission_prompt: PermissionPrompt | None = None,
         ask_user_prompt: AskUserPrompt | None = None,
         hook_executor: HookExecutor | None = None,
@@ -54,6 +55,7 @@ class QueryEngine:
         self._model = model
         self._system_prompt = system_prompt
         self._max_tokens = max_tokens
+        self._auto_compact_threshold_tokens = auto_compact_threshold_tokens
         self._permission_prompt = permission_prompt
         self._ask_user_prompt = ask_user_prompt
         self._hook_executor = hook_executor
@@ -136,6 +138,7 @@ class QueryEngine:
             model=self._model,
             system_prompt=self._system_prompt,
             max_tokens=self._max_tokens,
+            auto_compact_threshold_tokens=self._auto_compact_threshold_tokens,
             permission_prompt=self._permission_prompt,
             ask_user_prompt=self._ask_user_prompt,
             hook_executor=self._hook_executor,
@@ -208,6 +211,7 @@ class QueryEngine:
             model=self._model,
             system_prompt=self._system_prompt,
             max_tokens=min(self._max_tokens, 4096),
+            auto_compact_threshold_tokens=self._auto_compact_threshold_tokens,
             max_turns=6,
             ask_user_prompt=self._ask_user_prompt,
             tool_metadata=self._tool_metadata,

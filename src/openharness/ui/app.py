@@ -18,13 +18,30 @@ _API_KEY_GUIDE = """\
 
   配置方式 (任选其一):
 
-    1. 环境变量 (推荐):
+    1. 统一初始化 (推荐):
+       velaris setup anthropic --model claude-sonnet-4 --use-env
+       velaris setup moonshot --model kimi-k2 --use-env
+
+    2. 环境变量:
        export VELARIS_API_KEY="sk-ant-..."
        # 或
        export ANTHROPIC_API_KEY="sk-ant-..."
+       # OpenAI-compatible provider 也支持:
+       export OPENAI_API_KEY="sk-..."
+       export MOONSHOT_API_KEY="..."
 
-    2. 配置文件:
+    3. 配置文件:
        echo '{"api_key": "sk-ant-..."}' > ~/.velaris-agent/settings.json
+
+    4. Provider / 鉴权子命令:
+       velaris provider use moonshot
+       velaris auth status
+       velaris auth login moonshot --api-key sk-...
+       velaris auth login moonshot --use-env
+
+    5. OpenHarness 兼容入口:
+       oh provider current
+       openharness auth status
 
   不需要 API Key 也可以运行本地 Demo:
     velaris demo lifegoal
@@ -43,9 +60,12 @@ async def run_repl(
     prompt: str | None = None,
     cwd: str | None = None,
     model: str | None = None,
+    provider: str | None = None,
+    api_format: str | None = None,
     base_url: str | None = None,
     system_prompt: str | None = None,
     api_key: str | None = None,
+    auto_compact_threshold_tokens: int | None = None,
     api_client: SupportsStreamingMessages | None = None,
     backend_only: bool = False,
 ) -> None:
@@ -55,9 +75,12 @@ async def run_repl(
             await run_backend_host(
                 cwd=cwd,
                 model=model,
+                provider=provider,
+                api_format=api_format,
                 base_url=base_url,
                 system_prompt=system_prompt,
                 api_key=api_key,
+                auto_compact_threshold_tokens=auto_compact_threshold_tokens,
                 api_client=api_client,
             )
         except ValueError as exc:
@@ -70,9 +93,12 @@ async def run_repl(
             prompt=prompt,
             cwd=cwd,
             model=model,
+            provider=provider,
+            api_format=api_format,
             base_url=base_url,
             system_prompt=system_prompt,
             api_key=api_key,
+            auto_compact_threshold_tokens=auto_compact_threshold_tokens,
         )
     except ValueError as exc:
         _print_api_key_guide(exc)
@@ -87,10 +113,13 @@ async def run_print_mode(
     output_format: str = "text",
     cwd: str | None = None,
     model: str | None = None,
+    provider: str | None = None,
+    api_format: str | None = None,
     base_url: str | None = None,
     system_prompt: str | None = None,
     append_system_prompt: str | None = None,
     api_key: str | None = None,
+    auto_compact_threshold_tokens: int | None = None,
     api_client: SupportsStreamingMessages | None = None,
     permission_mode: str | None = None,
     max_turns: int | None = None,
@@ -113,9 +142,12 @@ async def run_print_mode(
         bundle = await build_runtime(
             prompt=prompt,
             model=model,
+            provider=provider,
+            api_format=api_format,
             base_url=base_url,
             system_prompt=system_prompt,
             api_key=api_key,
+            auto_compact_threshold_tokens=auto_compact_threshold_tokens,
             api_client=api_client,
             permission_prompt=_noop_permission,
             ask_user_prompt=_noop_ask,

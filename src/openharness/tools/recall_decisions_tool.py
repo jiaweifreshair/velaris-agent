@@ -46,11 +46,14 @@ class RecallDecisionsTool(BaseTool):
     ) -> ToolResult:
         """执行历史决策检索。"""
         try:
-            # 懒导入, 避免循环依赖
-            from velaris_agent.memory.decision_memory import DecisionMemory
+            from velaris_agent.persistence.factory import build_decision_memory
 
             base_dir = context.metadata.get("decision_memory_dir")
-            memory = DecisionMemory(base_dir=base_dir)
+            postgres_dsn = context.metadata.get("postgres_dsn", "")
+            memory = build_decision_memory(
+                postgres_dsn=postgres_dsn,
+                base_dir=base_dir,
+            )
 
             records = memory.recall_similar(
                 user_id=arguments.user_id,

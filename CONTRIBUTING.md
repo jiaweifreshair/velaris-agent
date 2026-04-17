@@ -42,6 +42,45 @@ cd frontend/terminal
 npx tsc --noEmit
 ```
 
+## MCP workflow example
+
+If your change touches MCP transport, auth refresh, or UI/status rendering, it helps to document or verify the interactive flow you tested.
+
+Typical local setup:
+
+```bash
+uv run velaris mcp add remote-http '{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer <token>"}}'
+uv run velaris mcp add remote-ws '{"type":"ws","url":"wss://example.com/mcp","headers":{"Authorization":"Bearer <token>"}}'
+uv run velaris
+```
+
+Useful in-session commands:
+
+```text
+/mcp
+/mcp auth remote-http bearer <token>
+/mcp auth remote-ws bearer <token>
+/mcp auth remote-ws header X-API-Key <token>
+```
+
+Current MCP text summary format is expected to look like this:
+
+```text
+MCP servers:
+- remote-http [connected] http
+  auth=True tools=2 resources=1
+  tool_names: search_docs, read_page
+  resource_uris: docs://index
+- remote-ws [connected] ws
+  auth=True tools=3 resources=1
+  mcp recovered: Auto-reconnect recovered after transport closed
+  tool_names: search_flights, search_hotels, get_weather
+  resource_uris: travel://guide
+- local-files [failed] stdio
+  auth=False tools=0 resources=0
+  mcp error: broken pipe
+```
+
 ## Pull request expectations
 
 - Keep PRs scoped. Small, reviewable changes merge faster than broad rewrites.

@@ -43,6 +43,7 @@ class QueryContext:
     model: str
     system_prompt: str
     max_tokens: int
+    auto_compact_threshold_tokens: int | None = None
     permission_prompt: PermissionPrompt | None = None
     ask_user_prompt: AskUserPrompt | None = None
     max_turns: int = 200
@@ -77,6 +78,7 @@ async def run_query(
             model=context.model,
             system_prompt=context.system_prompt,
             state=compact_state,
+            auto_compact_threshold_tokens=context.auto_compact_threshold_tokens,
         )
         # ---------------------------------------------------------------
 

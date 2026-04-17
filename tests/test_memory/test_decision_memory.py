@@ -106,6 +106,41 @@ def test_count_by_user(tmp_path: Path):
     assert mem.count_by_user("uB", scenario="travel") == 1
 
 
+def test_save_same_decision_id_replaces_index_entry(tmp_path: Path):
+    """重复保存同一决策应覆盖旧索引, 且最近优先顺序应以最后一次保存为准。"""
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+
+    mem.save(
+        _make_record(
+            decision_id="dec-old",
+            user_id="uA",
+            scenario="travel",
+            query="第一次保存",
+        )
+    )
+    mem.save(
+        _make_record(
+            decision_id="dec-new",
+            user_id="uA",
+            scenario="travel",
+            query="第二条记录",
+        )
+    )
+    mem.save(
+        _make_record(
+            decision_id="dec-old",
+            user_id="uA",
+            scenario="travel",
+            query="第一次保存-更新后",
+        )
+    )
+
+    results = mem.list_by_user("uA", scenario="travel")
+    assert [item.decision_id for item in results] == ["dec-old", "dec-new"]
+    assert mem.count_by_user("uA", scenario="travel") == 2
+    assert mem.get("dec-old").query == "第一次保存-更新后"
+
+
 def test_recall_similar(tmp_path: Path):
     """关键词匹配召回相似决策 (按空格分词)。"""
     mem = DecisionMemory(base_dir=tmp_path / "decisions")

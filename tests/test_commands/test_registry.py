@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from openharness.config.paths import get_feedback_log_path, get_project_issue_fi
 from openharness.config.settings import load_settings, save_settings, Settings
 from openharness.engine.messages import ConversationMessage, TextBlock
 from openharness.engine.query_engine import QueryEngine
-from openharness.mcp.types import McpHttpServerConfig, McpStdioServerConfig
+from openharness.mcp.types import McpHttpServerConfig, McpStdioServerConfig, McpWebSocketServerConfig
 from openharness.permissions import PermissionChecker
 from openharness.state import AppState, AppStateStore
 from openharness.tasks import get_task_manager
@@ -85,6 +86,95 @@ async def test_model_command_persists(tmp_path: Path, monkeypatch):
 
     assert "claude-opus-test" in result.message
     assert load_settings().model == "claude-opus-test"
+
+
+@pytest.mark.asyncio
+async def test_login_and_logout_commands_are_provider_aware(tmp_path: Path, monkeypatch):
+    """slash 登录命令应支持 provider 预设切换，并展示真实鉴权来源。"""
+
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    registry = create_default_command_registry()
+    context = _make_context(tmp_path)
+
+    login_command, login_args = registry.lookup("/login moonshot secret-key")
+    login_result = await login_command.handler(login_args, context)
+
+    assert "Auth configured:" in login_result.message
+    assert "- provider: moonshot" in login_result.message
+    assert "- credential_env: MOONSHOT_API_KEY" in login_result.message
+    settings = load_settings()
+    assert settings.provider == "moonshot"
+    assert settings.api_key == "secret-key"
+    assert settings.base_url == "https://api.moonshot.ai/v1"
+
+    save_settings(Settings(provider="moonshot", api_format="openai_compat", model="kimi-k2", api_key=""))
+    monkeypatch.setenv("MOONSHOT_API_KEY", "env-secret")
+
+    status_command, status_args = registry.lookup("/login")
+    status_result = await status_command.handler(status_args, context)
+
+    assert "Auth status:" in status_result.message
+    assert "- provider: moonshot" in status_result.message
+    assert "- auth_source: env:MOONSHOT_API_KEY" in status_result.message
+    assert "Usage: /login [provider] API_KEY" in status_result.message
+
+    logout_command, logout_args = registry.lookup("/logout")
+    logout_result = await logout_command.handler(logout_args, context)
+
+    assert "Auth cleared:" in logout_result.message
+    assert "- provider: moonshot" in logout_result.message
+    monkeypatch.delenv("MOONSHOT_API_KEY")
+    assert load_settings().api_key == ""
+
+
+@pytest.mark.asyncio
+async def test_logout_command_reports_env_source_when_still_active(tmp_path: Path, monkeypatch):
+    """slash 登出命令应提示环境变量来源仍在生效。"""
+
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("MOONSHOT_API_KEY", "env-secret")
+    save_settings(Settings(provider="moonshot", api_key="secret-key", api_format="openai_compat"))
+
+    registry = create_default_command_registry()
+    context = _make_context(tmp_path)
+    logout_command, logout_args = registry.lookup("/logout")
+
+    logout_result = await logout_command.handler(logout_args, context)
+
+    assert "Auth cleared:" in logout_result.message
+    assert "env:MOONSHOT_API_KEY" in logout_result.message
+
+
+@pytest.mark.asyncio
+async def test_provider_and_auth_slash_commands_align_with_cli_panels(tmp_path: Path, monkeypatch):
+    """slash `/provider` 与 `/auth` 应复用同一套状态面板语义。"""
+
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    save_settings(Settings(provider="anthropic", api_key="old-secret", model="claude-sonnet-4-20250514"))
+
+    registry = create_default_command_registry()
+    context = _make_context(tmp_path)
+
+    provider_current_command, provider_current_args = registry.lookup("/provider current")
+    provider_current_result = await provider_current_command.handler(provider_current_args, context)
+    assert "Provider current:" in provider_current_result.message
+    assert "- provider: anthropic" in provider_current_result.message
+
+    provider_use_command, provider_use_args = registry.lookup("/provider use moonshot")
+    provider_use_result = await provider_use_command.handler(provider_use_args, context)
+    assert "Provider switched:" in provider_use_result.message
+    assert "- provider: moonshot" in provider_use_result.message
+    assert load_settings().api_key == ""
+
+    auth_status_command, auth_status_args = registry.lookup("/auth status")
+    auth_status_result = await auth_status_command.handler(auth_status_args, context)
+    assert "Auth status:" in auth_status_result.message
+    assert "- provider: moonshot" in auth_status_result.message
+
+    auth_switch_command, auth_switch_args = registry.lookup("/auth switch anthropic")
+    auth_switch_result = await auth_switch_command.handler(auth_switch_args, context)
+    assert "Auth switched:" in auth_switch_result.message
+    assert "- provider: anthropic" in auth_switch_result.message
 
 
 @pytest.mark.asyncio
@@ -246,7 +336,7 @@ async def test_auth_feedback_and_project_context_commands(tmp_path: Path, monkey
 
     login_command, login_args = registry.lookup("/login sk-test-123456")
     login_result = await login_command.handler(login_args, context)
-    assert "Stored API key" in login_result.message
+    assert "Auth configured:" in login_result.message
     assert load_settings().api_key == "sk-test-123456"
 
     issue_command, issue_args = registry.lookup("/issue set Fix CI :: The CI flakes on task retry")
@@ -266,7 +356,7 @@ async def test_auth_feedback_and_project_context_commands(tmp_path: Path, monkey
 
     logout_command, logout_args = registry.lookup("/logout")
     logout_result = await logout_command.handler(logout_args, context)
-    assert "Cleared stored API key" in logout_result.message
+    assert "Auth cleared:" in logout_result.message
     assert load_settings().api_key == ""
 
 
@@ -329,6 +419,10 @@ async def test_agents_session_files_and_reload_plugins_commands(tmp_path: Path, 
     agent_show_command, agent_show_args = registry.lookup(f"/agents show {task.id}")
     agent_show_result = await agent_show_command.handler(agent_show_args, context)
     assert "test agent" in agent_show_result.message
+    await manager.stop_task(task.id)
+    waiter = manager._waiters.get(task.id)  # type: ignore[attr-defined]
+    if waiter is not None:
+        await asyncio.wait_for(waiter, timeout=5)
 
 
 @pytest.mark.asyncio
@@ -457,6 +551,51 @@ async def test_mcp_and_voice_commands_report_richer_state(tmp_path: Path, monkey
     assert "Voice mode:" in voice_result.message
     assert "Available:" in voice_result.message
     assert "Reason:" in voice_result.message
+
+
+@pytest.mark.asyncio
+async def test_mcp_auth_command_updates_ws_config_and_reconnects_live_manager(tmp_path: Path, monkeypatch):
+    """`/mcp auth` 在 ws server 上应更新活跃管理器并触发单 server 热重连。"""
+
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("OPENHARNESS_DATA_DIR", str(tmp_path / "data"))
+    save_settings(
+        Settings(
+            mcp_servers={
+                "ws-demo": McpWebSocketServerConfig(url="wss://example.com/mcp"),
+            }
+        )
+    )
+
+    class FakeActiveMcpManager:
+        """记录 slash command 对活跃 MCP 管理器的更新与重连调用。"""
+
+        def __init__(self) -> None:
+            self.updated: list[tuple[str, object]] = []
+            self.reconnected: list[str] = []
+
+        def update_server_config(self, name: str, config: object) -> None:
+            self.updated.append((name, config))
+
+        async def reconnect_server(self, name: str, *, attempts: int = 2, base_delay: float = 0.1) -> bool:
+            del attempts, base_delay
+            self.reconnected.append(name)
+            return True
+
+    registry = create_default_command_registry()
+    context = _make_context(tmp_path)
+    active_manager = FakeActiveMcpManager()
+    context.engine._tool_metadata = {"mcp_manager": active_manager}
+
+    command, args = registry.lookup("/mcp auth ws-demo header X-API-Key ws-token")
+    result = await command.handler(args, context)
+
+    assert "Saved MCP auth for ws-demo" in result.message
+    assert "Reconnected active MCP session" in result.message
+    saved = load_settings().mcp_servers["ws-demo"]
+    assert saved.headers["X-API-Key"] == "ws-token"
+    assert active_manager.updated[0][0] == "ws-demo"
+    assert active_manager.reconnected == ["ws-demo"]
 
 
 @pytest.mark.asyncio

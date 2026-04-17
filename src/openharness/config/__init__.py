@@ -9,7 +9,7 @@ from openharness.config.paths import (
     get_data_dir,
     get_logs_dir,
 )
-from openharness.config.settings import Settings, load_settings
+from openharness.config.settings import Settings, load_settings, save_settings
 
 __all__ = [
     "Settings",
@@ -18,4 +18,5 @@ __all__ = [
     "get_data_dir",
     "get_logs_dir",
     "load_settings",
+    "save_settings",
 ]

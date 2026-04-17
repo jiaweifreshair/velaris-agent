@@ -24,7 +24,8 @@ from openharness.config.paths import (
 from openharness.bridge import get_bridge_manager
 from openharness.bridge.types import WorkSecret
 from openharness.bridge.work_secret import build_sdk_url, decode_work_secret, encode_work_secret
-from openharness.api.provider import auth_status, detect_provider
+from openharness.api.provider import detect_provider, render_provider_status_panel, resolve_auth_status
+from openharness.api.registry import get_provider_spec
 from openharness.config.settings import Settings, load_settings, save_settings
 from openharness.engine.messages import ConversationMessage
 from openharness.engine.query_engine import QueryEngine
@@ -77,6 +78,18 @@ class CommandContext:
     cwd: str = "."
     tool_registry: ToolRegistry | None = None
     app_state: AppStateStore | None = None
+
+
+def _apply_provider_preset(settings: Settings, provider_name: str) -> str:
+    """按 provider 预设更新 settings，并返回规范化后的 provider 名称。"""
+
+    spec = get_provider_spec(provider_name)
+    if spec is None:
+        raise ValueError(f"Unknown provider: {provider_name}")
+    settings.provider = spec.name
+    settings.api_format = spec.api_format
+    settings.base_url = spec.default_base_url or None
+    return spec.name
 
 
 CommandHandler = Callable[[str, CommandContext], Awaitable[CommandResult]]
@@ -712,35 +725,129 @@ def create_default_command_registry() -> CommandRegistry:
     async def _login_handler(args: str, context: CommandContext) -> CommandResult:
         del context
         settings = load_settings()
-        provider = detect_provider(settings)
-        api_key = args.strip()
+        raw = args.strip()
+        provider_token = ""
+        api_key = ""
+        target_settings = settings
+
+        if raw:
+            tokens = raw.split(maxsplit=1)
+            provider_spec = get_provider_spec(tokens[0])
+            if provider_spec is not None:
+                provider_token = provider_spec.name
+                target_settings = settings.model_copy()
+                _apply_provider_preset(target_settings, provider_spec.name)
+                if settings.provider != provider_spec.name:
+                    target_settings.api_key = ""
+                if len(tokens) == 2:
+                    api_key = tokens[1].strip()
+            else:
+                api_key = raw
+
         if not api_key:
-            masked = (
-                f"{settings.api_key[:6]}...{settings.api_key[-4:]}"
-                if settings.api_key
-                else "(not configured)"
-            )
             return CommandResult(
                 message=(
-                    f"Auth status:\n"
-                    f"- provider: {provider.name}\n"
-                    f"- auth_status: {auth_status(settings)}\n"
-                    f"- base_url: {settings.base_url or '(default)'}\n"
-                    f"- model: {settings.model}\n"
-                    f"- api_key: {masked}\n"
-                    "Usage: /login API_KEY"
+                    render_provider_status_panel(title="Auth status", settings=target_settings)
+                    + "\nUsage: /login [provider] API_KEY"
                 )
             )
+        if provider_token:
+            _apply_provider_preset(settings, provider_token)
         settings.api_key = api_key
         save_settings(settings)
-        return CommandResult(message="Stored API key in ~/.velaris-agent/settings.json")
+        return CommandResult(
+            message=render_provider_status_panel(
+                title="Auth configured",
+                settings=settings,
+                auth_note="stored in settings.json",
+            )
+        )
 
-    async def _logout_handler(_: str, context: CommandContext) -> CommandResult:
+    async def _logout_handler(args: str, context: CommandContext) -> CommandResult:
         del context
         settings = load_settings()
+        raw = args.strip()
+        if raw:
+            try:
+                _apply_provider_preset(settings, raw)
+            except ValueError as exc:
+                return CommandResult(message=str(exc))
         settings.api_key = ""
         save_settings(settings)
-        return CommandResult(message="Cleared stored API key.")
+        auth_info = resolve_auth_status(settings)
+        auth_note = "cleared stored API key"
+        if auth_info.source != "missing":
+            auth_note = f"{auth_note}; active auth source remains {auth_info.source}"
+        return CommandResult(
+            message=render_provider_status_panel(
+                title="Auth cleared",
+                settings=settings,
+                auth_note=auth_note,
+            )
+        )
+
+    async def _provider_handler(args: str, context: CommandContext) -> CommandResult:
+        del context
+        settings = load_settings()
+        tokens = args.split(maxsplit=1)
+        if not tokens or tokens[0] in {"show", "current", "status"}:
+            return CommandResult(message=render_provider_status_panel(title="Provider current", settings=settings))
+        if tokens[0] == "use" and len(tokens) == 2:
+            provider_name = tokens[1].strip()
+            previous_provider = settings.provider or ""
+            note = ""
+            try:
+                target_provider = _apply_provider_preset(settings, provider_name)
+            except ValueError as exc:
+                return CommandResult(message=str(exc))
+            if previous_provider and previous_provider != target_provider and settings.api_key:
+                settings.api_key = ""
+                note = "cleared stored API key because provider changed"
+            save_settings(settings)
+            return CommandResult(
+                message=render_provider_status_panel(
+                    title="Provider switched",
+                    settings=settings,
+                    auth_note=note or None,
+                )
+            )
+        return CommandResult(message="Usage: /provider [current|use PROVIDER]")
+
+    async def _auth_handler(args: str, context: CommandContext) -> CommandResult:
+        tokens = args.split(maxsplit=1)
+        if not tokens or tokens[0] in {"show", "status"}:
+            return CommandResult(message=render_provider_status_panel(title="Auth status", settings=load_settings()))
+        if tokens[0] == "switch":
+            settings = load_settings()
+            previous_provider = detect_provider(settings).name
+            provider_name = tokens[1].strip() if len(tokens) == 2 else ""
+            if not provider_name:
+                return CommandResult(message="Usage: /auth switch PROVIDER")
+            note = ""
+            try:
+                target_provider = _apply_provider_preset(settings, provider_name)
+            except ValueError as exc:
+                return CommandResult(message=str(exc))
+            if previous_provider != target_provider and settings.api_key:
+                settings.api_key = ""
+                note = "cleared stored API key because provider changed"
+            elif previous_provider == target_provider:
+                note = "provider already active"
+            save_settings(settings)
+            return CommandResult(
+                message=render_provider_status_panel(
+                    title="Auth switched",
+                    settings=settings,
+                    auth_note=note or None,
+                )
+            )
+        if tokens[0] == "login":
+            login_args = tokens[1] if len(tokens) == 2 else ""
+            return await _login_handler(login_args, context)
+        if tokens[0] == "logout":
+            logout_args = tokens[1] if len(tokens) == 2 else ""
+            return await _logout_handler(logout_args, context)
+        return CommandResult(message="Usage: /auth [status|switch PROVIDER|login [provider] API_KEY|logout [provider]]")
 
     async def _feedback_handler(args: str, context: CommandContext) -> CommandResult:
         del context
@@ -914,6 +1021,26 @@ def create_default_command_registry() -> CommandRegistry:
             else:
                 return CommandResult(message=f"Server {server_name} does not support auth updates")
             save_settings(settings)
+            updated_config = settings.mcp_servers[server_name]
+            mcp_manager = context.engine.get_tool_metadata().get("mcp_manager")
+            if mcp_manager is not None and hasattr(mcp_manager, "update_server_config"):
+                try:
+                    mcp_manager.update_server_config(server_name, updated_config)
+                    if hasattr(mcp_manager, "reconnect_server"):
+                        reconnected = await mcp_manager.reconnect_server(server_name)
+                        if reconnected:
+                            return CommandResult(
+                                message=f"Saved MCP auth for {server_name}. Reconnected active MCP session."
+                            )
+                    elif hasattr(mcp_manager, "reconnect_all"):
+                        await mcp_manager.reconnect_all()
+                        return CommandResult(
+                            message=f"Saved MCP auth for {server_name}. Reconnected active MCP session."
+                        )
+                except Exception as exc:
+                    return CommandResult(
+                        message=f"Saved MCP auth for {server_name}, but reconnect failed: {exc}"
+                    )
             return CommandResult(message=f"Saved MCP auth for {server_name}. Restart session to reconnect.")
         return CommandResult(message=context.mcp_summary or "No MCP servers configured.")
 
@@ -1316,6 +1443,8 @@ def create_default_command_registry() -> CommandRegistry:
     registry.register(SlashCommand("files", "List files in the current workspace", _files_handler))
     registry.register(SlashCommand("init", "Initialize project OpenHarness files", _init_handler))
     registry.register(SlashCommand("bridge", "Inspect bridge helpers and spawn bridge sessions", _bridge_handler))
+    registry.register(SlashCommand("provider", "Show or switch provider presets", _provider_handler))
+    registry.register(SlashCommand("auth", "Show or switch provider-aware auth state", _auth_handler))
     registry.register(SlashCommand("login", "Show auth status or store an API key", _login_handler))
     registry.register(SlashCommand("logout", "Clear the stored API key", _logout_handler))
     registry.register(SlashCommand("feedback", "Save CLI feedback to the local feedback log", _feedback_handler))

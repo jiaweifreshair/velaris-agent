@@ -18,6 +18,7 @@ async def test_bridge_session_writes_output_in_cwd(tmp_path: Path):
         cwd=tmp_path,
     )
     await handle.process.wait()
+    await handle.process.communicate()
     assert handle.process.returncode == 0
     assert (tmp_path / "bridge.txt").read_text(encoding="utf-8") == "bridge flow ok"
 

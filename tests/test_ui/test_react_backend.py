@@ -7,6 +7,7 @@ import pytest
 from openharness.api.client import ApiMessageCompleteEvent
 from openharness.api.usage import UsageSnapshot
 from openharness.engine.messages import ConversationMessage, TextBlock
+from openharness.mcp.types import McpConnectionStatus, McpResourceInfo, McpToolInfo
 from openharness.ui.backend_host import BackendHostConfig, ReactBackendHost
 from openharness.ui.runtime import build_runtime, close_runtime, start_runtime
 
@@ -24,6 +25,19 @@ class StaticApiClient:
             usage=UsageSnapshot(input_tokens=2, output_tokens=3),
             stop_reason=None,
         )
+
+
+class StaticMcpManager:
+    """返回固定 MCP 状态，供 React backend 端到端快照测试使用。"""
+
+    def __init__(self, statuses) -> None:
+        self._statuses = statuses
+
+    def list_statuses(self):
+        return self._statuses
+
+    async def close(self) -> None:
+        return None
 
 
 @pytest.mark.asyncio
@@ -88,5 +102,78 @@ async def test_backend_host_processes_model_turn(tmp_path, monkeypatch):
         and event.item
         and event.item.role == "assistant"
         and "hello from react backend" in event.item.text
+        for event in events
+    )
+
+
+@pytest.mark.asyncio
+async def test_backend_host_status_snapshot_includes_ws_mcp_metadata(tmp_path, monkeypatch):
+    """React backend 在 `/mcp` 后应把 ws transport 状态快照发给前端。"""
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("OPENHARNESS_DATA_DIR", str(tmp_path / "data"))
+
+    host = ReactBackendHost(BackendHostConfig(api_client=StaticApiClient("unused")))
+    host._bundle = await build_runtime(api_client=StaticApiClient("unused"))
+    host._bundle.mcp_manager = StaticMcpManager(
+        [
+            McpConnectionStatus(
+                name="travel-ws",
+                state="connected",
+                detail="Auto-reconnect recovered after transport closed",
+                transport="ws",
+                auth_configured=True,
+                tools=[
+                    McpToolInfo(
+                        server_name="travel-ws",
+                        name="search_flights",
+                        description="Search flights",
+                        input_schema={"type": "object", "properties": {}},
+                    )
+                ],
+                resources=[
+                    McpResourceInfo(
+                        server_name="travel-ws",
+                        name="Travel Guide",
+                        uri="travel://guide",
+                        description="guide",
+                    )
+                ],
+            )
+        ]
+    )
+    events = []
+
+    async def _emit(event):
+        events.append(event)
+
+    host._emit = _emit  # type: ignore[method-assign]
+    await start_runtime(host._bundle)
+    try:
+        should_continue = await host._process_line("/mcp")
+    finally:
+        await close_runtime(host._bundle)
+
+    assert should_continue is True
+    assert any(
+        event.type == "transcript_item"
+        and event.item
+        and event.item.role == "system"
+        and "travel-ws [connected] ws" in event.item.text
+        and "auth=True tools=1 resources=1" in event.item.text
+        for event in events
+    )
+    assert any(
+        event.type == "state_snapshot"
+        and event.mcp_servers
+        and event.mcp_servers[0]["name"] == "travel-ws"
+        and event.state
+        and event.state["mcp_notice"] == "Auto-reconnect recovered after transport closed"
+        and event.state["mcp_notice_level"] == "success"
+        and event.mcp_servers[0]["detail_level"] == "success"
+        and event.mcp_servers[0]["transport"] == "ws"
+        and event.mcp_servers[0]["tool_count"] == 1
+        and event.mcp_servers[0]["resource_count"] == 1
         for event in events
     )

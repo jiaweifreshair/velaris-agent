@@ -60,14 +60,25 @@ class SaveDecisionTool(BaseTool):
     ) -> ToolResult:
         """执行决策保存。"""
         try:
-            # 懒导入, 避免循环依赖
-            from velaris_agent.memory.decision_memory import DecisionMemory
+            from velaris_agent.evolution.self_evolution import (
+                SELF_EVOLUTION_REVIEW_JOB_TYPE,
+                SelfEvolutionEngine,
+                build_self_evolution_review_job_payload,
+            )
             from velaris_agent.memory.types import DecisionRecord
+            from velaris_agent.persistence.factory import (
+                build_decision_memory,
+                build_job_queue,
+            )
 
             base_dir = context.metadata.get("decision_memory_dir")
-            memory = DecisionMemory(base_dir=base_dir)
+            postgres_dsn = context.metadata.get("postgres_dsn", "")
+            memory = build_decision_memory(
+                postgres_dsn=postgres_dsn,
+                base_dir=base_dir,
+            )
 
-            decision_id = DecisionMemory.generate_id()
+            decision_id = memory.generate_id()
             record = DecisionRecord(
                 decision_id=decision_id,
                 user_id=arguments.user_id,
@@ -86,6 +97,7 @@ class SaveDecisionTool(BaseTool):
             review_interval = int(context.metadata.get("evolution_review_interval", 10))
             self_evolution_payload: dict[str, Any] = {
                 "triggered": False,
+                "queued": False,
                 "next_trigger_in": None,
             }
 
@@ -100,24 +112,64 @@ class SaveDecisionTool(BaseTool):
                 self_evolution_payload["next_trigger_in"] = 0 if remain == review_interval else remain
 
                 if current_count % review_interval == 0:
-                    from velaris_agent.evolution.self_evolution import SelfEvolutionEngine
-
-                    engine = SelfEvolutionEngine(
-                        memory=memory,
-                        report_dir=context.metadata.get("evolution_report_dir"),
-                    )
-                    report = engine.review(
-                        user_id=arguments.user_id,
-                        scenario=arguments.scenario,
-                        window=max(10, review_interval * 2),
-                        persist_report=True,
-                    )
-                    self_evolution_payload = {
-                        "triggered": True,
-                        "report_path": report.report_path,
-                        "sample_size": report.sample_size,
-                        "actions": [a.model_dump(mode="json") for a in report.actions],
-                    }
+                    window = max(10, review_interval * 2)
+                    if postgres_dsn.strip():
+                        queue = build_job_queue(postgres_dsn=postgres_dsn)
+                        if queue is not None:
+                            job_id = queue.enqueue(
+                                SELF_EVOLUTION_REVIEW_JOB_TYPE,
+                                idempotency_key=f"{arguments.user_id}:{arguments.scenario}:{current_count}",
+                                payload=build_self_evolution_review_job_payload(
+                                    user_id=arguments.user_id,
+                                    scenario=arguments.scenario,
+                                    window=window,
+                                    persist_report=True,
+                                    report_dir=context.metadata.get("evolution_report_dir"),
+                                    decision_memory_dir=base_dir,
+                                ),
+                            )
+                            self_evolution_payload = {
+                                "triggered": False,
+                                "queued": True,
+                                "job_id": job_id,
+                                "next_trigger_in": 0,
+                            }
+                        else:
+                            engine = SelfEvolutionEngine(
+                                memory=memory,
+                                report_dir=context.metadata.get("evolution_report_dir"),
+                            )
+                            report = engine.review(
+                                user_id=arguments.user_id,
+                                scenario=arguments.scenario,
+                                window=window,
+                                persist_report=True,
+                            )
+                            self_evolution_payload = {
+                                "triggered": True,
+                                "queued": False,
+                                "report_path": report.report_path,
+                                "sample_size": report.sample_size,
+                                "actions": [a.model_dump(mode="json") for a in report.actions],
+                            }
+                    else:
+                        engine = SelfEvolutionEngine(
+                            memory=memory,
+                            report_dir=context.metadata.get("evolution_report_dir"),
+                        )
+                        report = engine.review(
+                            user_id=arguments.user_id,
+                            scenario=arguments.scenario,
+                            window=window,
+                            persist_report=True,
+                        )
+                        self_evolution_payload = {
+                            "triggered": True,
+                            "queued": False,
+                            "report_path": report.report_path,
+                            "sample_size": report.sample_size,
+                            "actions": [a.model_dump(mode="json") for a in report.actions],
+                        }
 
             result = {
                 "decision_id": saved_id,

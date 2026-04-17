@@ -13,17 +13,20 @@ The format is based on Keep a Changelog, and this project currently tracks chang
 - `CONTRIBUTING.md` with local setup, validation commands, and PR expectations.
 - `docs/SHOWCASE.md` with concrete OpenHarness usage patterns and demo commands.
 - GitHub issue templates and a pull request template.
+- MCP runtime upgrades: WebSocket transport support, active-session `/mcp auth` hot refresh, server auto-reconnect, and explicit notice severity in UI/backend snapshots.
 
 ### Fixed
 
 - Memory scanner now parses YAML frontmatter (`name`, `description`, `type`) instead of returning raw `---` as description.
 - Memory search matches against body content in addition to metadata, with metadata weighted higher for relevance.
 - Memory search tokenizer handles Han characters for multilingual queries.
+- MCP text summaries and terminal surfaces now use consistent recovered/error labels for reconnect outcomes and per-server details.
 
 ### Changed
 
 - README now links to contribution docs, changelog, showcase material, and provider compatibility guidance.
 - README quick start now includes a one-command demo and clearer provider compatibility notes.
+- README, `CONTRIBUTING.md`, and `docs/MIGRATION.md` now document the current Velaris MCP workflow, auth refresh commands, and compact `/mcp` summary format.
 
 ## [0.1.0] - 2026-04-01
 

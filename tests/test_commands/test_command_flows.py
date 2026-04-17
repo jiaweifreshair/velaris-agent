@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from openharness.engine.messages import ConversationMessage, TextBlock
 from openharness.engine.query_engine import QueryEngine
 from openharness.permissions import PermissionChecker
 from openharness.state import AppState, AppStateStore
+from openharness.tasks import get_task_manager
 from openharness.tools import create_default_tool_registry
 
 
@@ -124,6 +126,10 @@ async def test_command_flow_for_memory_modes_and_tasks(tmp_path: Path, monkeypat
     assert "- voice_mode: on" in doctor_result.message
     assert load_settings().fast_mode is True
     assert context.app_state.get().fast_mode is True
+    await get_task_manager().stop_task(task_id)
+    waiter = get_task_manager()._waiters.get(task_id)  # type: ignore[attr-defined]
+    if waiter is not None:
+        await asyncio.wait_for(waiter, timeout=5)
 
 
 @pytest.mark.asyncio

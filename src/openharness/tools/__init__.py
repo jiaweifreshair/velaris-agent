@@ -53,6 +53,7 @@ from openharness.tools.team_create_tool import TeamCreateTool
 from openharness.tools.team_delete_tool import TeamDeleteTool
 from openharness.tools.tokencost_analyze_tool import TokenCostAnalyzeTool
 from openharness.tools.todo_write_tool import TodoWriteTool
+from openharness.tools.travel_compare_tool import TravelCompareTool
 from openharness.tools.tool_search_tool import ToolSearchTool
 from openharness.tools.travel_recommend_tool import TravelRecommendTool
 from openharness.tools.web_fetch_tool import WebFetchTool
@@ -79,6 +80,7 @@ def create_default_tool_registry(mcp_manager=None) -> ToolRegistry:
         KnowledgeQueryTool(),
         KnowledgeLintTool(),
         TravelRecommendTool(),
+        TravelCompareTool(),
         TokenCostAnalyzeTool(),
         RobotClawDispatchTool(),
         FileReadTool(),
