@@ -2,7 +2,124 @@
 
 from __future__ import annotations
 
+import os
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+
 from openharness.velaris.orchestrator import VelarisBizOrchestrator
+from velaris_agent.memory.types import (
+    InterestDimension,
+    PreferenceDirection,
+    Stakeholder,
+    StakeholderMapModel,
+    StakeholderRole,
+)
+
+
+@pytest.fixture
+def postgres_dsn() -> str:
+    """提供编排器审计链路使用的 PostgreSQL DSN；未配置时跳过集成测试。"""
+
+    dsn = os.getenv("VELARIS_TEST_POSTGRES_DSN", "").strip()
+    if not dsn:
+        pytest.skip("未设置 VELARIS_TEST_POSTGRES_DSN, 跳过 PostgreSQL 集成测试")
+    return dsn
+
+
+def _make_procurement_stakeholder_map() -> StakeholderMapModel:
+    """构造一个会产生高严重度 cost 冲突的采购 stakeholder map。"""
+
+    return StakeholderMapModel(
+        map_id="procurement-map-test",
+        scenario="procurement",
+        stakeholders=[
+            Stakeholder(
+                stakeholder_id="finance",
+                role=StakeholderRole.ORG,
+                display_name="财务",
+                scenario="procurement",
+                interest_dimensions=[
+                    InterestDimension(
+                        dimension="cost",
+                        direction=PreferenceDirection.LOWER_IS_BETTER,
+                        weight=0.9,
+                    )
+                ],
+                influence_weights={"cost": 0.95},
+            ),
+            Stakeholder(
+                stakeholder_id="delivery-owner",
+                role=StakeholderRole.USER,
+                display_name="交付负责人",
+                scenario="procurement",
+                interest_dimensions=[
+                    InterestDimension(
+                        dimension="cost",
+                        direction=PreferenceDirection.HIGHER_IS_BETTER,
+                        weight=0.8,
+                    )
+                ],
+                influence_weights={"cost": 0.90},
+            ),
+        ],
+        alignment_matrix=[],
+        conflicts=[],
+        timestamp=datetime.now(UTC),
+    )
+
+
+def _make_quality_focused_procurement_stakeholder_map() -> StakeholderMapModel:
+    """构造一个会把采购权重明显拉向 quality 的 stakeholder map。"""
+
+    return StakeholderMapModel(
+        map_id="procurement-quality-map-test",
+        scenario="procurement",
+        stakeholders=[
+            Stakeholder(
+                stakeholder_id="cto",
+                role=StakeholderRole.ORG,
+                display_name="技术负责人",
+                scenario="procurement",
+                interest_dimensions=[
+                    InterestDimension(
+                        dimension="quality",
+                        direction=PreferenceDirection.HIGHER_IS_BETTER,
+                        weight=0.95,
+                    ),
+                    InterestDimension(
+                        dimension="cost",
+                        direction=PreferenceDirection.LOWER_IS_BETTER,
+                        weight=0.20,
+                    ),
+                ],
+                influence_weights={"quality": 1.0, "cost": 0.0},
+            ),
+            Stakeholder(
+                stakeholder_id="ops",
+                role=StakeholderRole.USER,
+                display_name="运维负责人",
+                scenario="procurement",
+                interest_dimensions=[
+                    InterestDimension(
+                        dimension="quality",
+                        direction=PreferenceDirection.HIGHER_IS_BETTER,
+                        weight=0.90,
+                    ),
+                    InterestDimension(
+                        dimension="cost",
+                        direction=PreferenceDirection.LOWER_IS_BETTER,
+                        weight=0.25,
+                    ),
+                ],
+                influence_weights={"quality": 1.0, "cost": 0.0},
+            ),
+        ],
+        alignment_matrix=[],
+        conflicts=[],
+        timestamp=datetime.now(UTC),
+    )
 
 
 def test_orchestrator_executes_tokencost_flow_with_runtime_controls():
@@ -42,12 +159,36 @@ def test_orchestrator_executes_tokencost_flow_with_runtime_controls():
     assert result["task"]["status"] == "completed"
     assert result["result"]["projected_monthly_cost"] == 850
     assert result["outcome"]["success"] is True
+    assert result["audit_event_count"] == 0
     assert len(orchestrator.task_ledger.list_by_session("session-token")) == 1
     assert len(orchestrator.outcome_store.list_by_session("session-token")) == 1
 
 
 def test_orchestrator_executes_robotclaw_flow_with_strict_governance():
-    orchestrator = VelarisBizOrchestrator()
+    class InMemoryAuditStore:
+        """用于严格治理场景的最小审计仓储。"""
+
+        def __init__(self) -> None:
+            self.events: list[dict[str, object]] = []
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            self.events.append(
+                {
+                    "session_id": session_id,
+                    "step_name": step_name,
+                    "operator_id": operator_id,
+                    "payload": dict(payload or {}),
+                }
+            )
+
+    audit_store = InMemoryAuditStore()
+    orchestrator = VelarisBizOrchestrator(audit_store=audit_store)
 
     result = orchestrator.execute(
         query="为 robotaxi 派单生成服务提案并形成交易合约",
@@ -82,4 +223,372 @@ def test_orchestrator_executes_robotclaw_flow_with_strict_governance():
     assert "audit" in result["authority"]["required_capabilities"]
     assert result["result"]["recommended"]["id"] == "dispatch-a"
     assert result["task"]["status"] == "completed"
+    assert result["audit_event_count"] == 2
     assert result["outcome"]["reason_codes"][0] == "R001_high_risk_go_robotclaw"
+    assert len(audit_store.events) == 2
+
+
+def test_orchestrator_wires_stakeholder_context_into_procurement_graph():
+    """采购编排链路应把 stakeholder_map 产出的 context 接到 operator graph。"""
+
+    class InMemoryAuditStore:
+        """为采购编排测试提供最小审计仓储。"""
+
+        def __init__(self) -> None:
+            self.events: list[dict[str, object]] = []
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            self.events.append(
+                {
+                    "session_id": session_id,
+                    "step_name": step_name,
+                    "operator_id": operator_id,
+                    "payload": dict(payload or {}),
+                }
+            )
+
+    audit_store = InMemoryAuditStore()
+    orchestrator = VelarisBizOrchestrator(audit_store=audit_store)
+
+    result = orchestrator.execute(
+        query="比较两家供应商，预算不超过 200000，必须通过合规审计。",
+        scenario="procurement",
+        payload={
+            "budget_max": 200000,
+            "require_compliance": True,
+            "stakeholder_map": _make_procurement_stakeholder_map().model_dump(mode="json"),
+            "options": [
+                {
+                    "id": "vendor-a",
+                    "label": "供应商 A",
+                    "price_cny": 118000,
+                    "delivery_days": 9,
+                    "quality_score": 0.90,
+                    "compliance_score": 0.98,
+                    "risk_score": 0.10,
+                    "available": True,
+                },
+                {
+                    "id": "vendor-b",
+                    "label": "供应商 B",
+                    "price_cny": 125000,
+                    "delivery_days": 7,
+                    "quality_score": 0.88,
+                    "compliance_score": 0.96,
+                    "risk_score": 0.12,
+                    "available": True,
+                },
+            ],
+        },
+        session_id="session-procurement-stakeholder",
+    )
+
+    stakeholder_trace = next(
+        item
+        for item in result["result"]["operator_trace"]
+        if item["operator_id"] == "stakeholder"
+    )
+
+    assert "stakeholder_context" in result["plan"]
+    assert result["plan"]["stakeholder_context"]["conflicts"]
+    assert result["plan"]["stakeholder_context"]["negotiation_proposals"]
+    assert stakeholder_trace["warnings"] == result["plan"]["stakeholder_context"]["warnings"]
+
+
+def test_orchestrator_passes_plan_decision_weights_into_procurement_ranking():
+    """编排器生成的 decision_weights 必须真正影响采购排序。"""
+
+    class InMemoryAuditStore:
+        """为权重透传测试提供最小审计仓储。"""
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            del session_id, step_name, operator_id, payload
+
+    orchestrator = VelarisBizOrchestrator(audit_store=InMemoryAuditStore())
+
+    result = orchestrator.execute(
+        query="比较两家供应商，质量优先，但仍需满足合规。",
+        scenario="procurement",
+        payload={
+            "budget_max": 250000,
+            "require_compliance": True,
+            "stakeholder_map": _make_quality_focused_procurement_stakeholder_map().model_dump(mode="json"),
+            "options": [
+                {
+                    "id": "budget-choice",
+                    "label": "低价方案",
+                    "price_cny": 100000,
+                    "delivery_days": 7,
+                    "quality_score": 0.70,
+                    "compliance_score": 0.95,
+                    "risk_score": 0.10,
+                    "available": True,
+                },
+                {
+                    "id": "premium-choice",
+                    "label": "高质量方案",
+                    "price_cny": 170000,
+                    "delivery_days": 7,
+                    "quality_score": 0.95,
+                    "compliance_score": 0.95,
+                    "risk_score": 0.10,
+                    "available": True,
+                },
+            ],
+        },
+        session_id="session-procurement-weighted",
+    )
+
+    assert result["plan"]["decision_weights"]["quality"] > result["plan"]["decision_weights"]["cost"]
+    assert result["result"]["recommended"]["id"] == "premium-choice"
+
+
+def test_orchestrator_persists_audit_trace(postgres_dsn: str):
+    """编排器在接入 PostgreSQL 审计仓储时应写入最小审计轨迹。"""
+
+    from velaris_agent.persistence.postgres_runtime import (
+        AuditEventStore,
+        PostgresOutcomeStore,
+        PostgresTaskLedger,
+    )
+    from velaris_agent.persistence.schema import bootstrap_schema
+
+    session_id = f"session-audit-{uuid4().hex[:12]}"
+
+    bootstrap_schema(postgres_dsn)
+    audit_store = AuditEventStore(postgres_dsn)
+    orchestrator = VelarisBizOrchestrator(
+        task_ledger=PostgresTaskLedger(postgres_dsn),
+        outcome_store=PostgresOutcomeStore(postgres_dsn),
+        audit_store=audit_store,
+    )
+
+    result = orchestrator.execute(
+        query="我每月 OpenAI 成本 2000 美元，想降到 800",
+        constraints={"target_monthly_cost": 800},
+        payload={
+            "current_monthly_cost": 2000,
+            "target_monthly_cost": 800,
+            "suggestions": [
+                {
+                    "id": "switch-tier",
+                    "title": "分层路由",
+                    "estimated_saving": 900,
+                    "quality_retention": 0.88,
+                    "execution_speed": 0.9,
+                    "effort": "medium",
+                }
+            ],
+        },
+        session_id=session_id,
+    )
+
+    events = audit_store.list_by_session(session_id)
+
+    assert result["task"]["status"] == "completed"
+    assert result["audit_event_count"] == 2
+    assert len(events) == 2
+    assert {event.step_name for event in events} == {
+        "orchestrator.routed",
+        "orchestrator.completed",
+    }
+
+
+def test_orchestrator_ignores_audit_store_failures_on_success():
+    """审计仓储写入失败时不应把成功流程改写为失败。"""
+
+    class BrokenAuditStore:
+        """用于模拟审计仓储不可用的最小假对象。"""
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            raise RuntimeError(f"audit down: {step_name}")
+
+    orchestrator = VelarisBizOrchestrator(audit_store=BrokenAuditStore())
+
+    result = orchestrator.execute(
+        query="我每月 OpenAI 成本 2000 美元，想降到 800",
+        constraints={"target_monthly_cost": 800},
+        payload={
+            "current_monthly_cost": 2000,
+            "target_monthly_cost": 800,
+            "suggestions": [
+                {
+                    "id": "switch-tier",
+                    "title": "分层路由",
+                    "estimated_saving": 900,
+                    "quality_retention": 0.88,
+                    "execution_speed": 0.9,
+                    "effort": "medium",
+                }
+            ],
+        },
+        session_id="session-audit-fallback",
+    )
+
+    assert result["task"]["status"] == "completed"
+    assert result["outcome"]["success"] is True
+    assert result["audit_event_count"] == 0
+
+
+def test_orchestrator_requires_audit_trail_for_strict_governance():
+    """高风险审计场景在审计链路不可用时必须失败，而不是静默降级。"""
+
+    class BrokenAuditStore:
+        """用于模拟审计仓储不可用的最小假对象。"""
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            raise RuntimeError(f"audit down: {step_name}")
+
+    orchestrator = VelarisBizOrchestrator(audit_store=BrokenAuditStore())
+
+    with pytest.raises(RuntimeError) as exc_info:
+        orchestrator.execute(
+            query="为 robotaxi 派单生成服务提案并形成交易合约",
+            constraints={"requires_audit": True},
+            payload={
+                "max_budget_cny": 200000,
+                "proposals": [
+                    {
+                        "id": "dispatch-a",
+                        "price_cny": 180000,
+                        "eta_minutes": 22,
+                        "safety_score": 0.95,
+                        "compliance_score": 0.95,
+                        "available": True,
+                    }
+                ],
+            },
+            session_id="session-required-audit",
+        )
+
+    error_payload = exc_info.value.args[0]
+    assert error_payload["task"]["status"] == "failed"
+    assert error_payload["outcome"]["success"] is False
+    assert "audit trail required" in error_payload["outcome"]["summary"]
+    assert error_payload["audit_event_count"] == 0
+
+
+def test_orchestrator_preserves_original_business_failure_when_audit_store_breaks():
+    """业务执行失败时，审计异常不应覆盖原始失败上下文。"""
+
+    class BrokenAuditStore:
+        """用于模拟审计仓储不可用的最小假对象。"""
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            raise RuntimeError(f"audit down: {step_name}")
+
+    orchestrator = VelarisBizOrchestrator(audit_store=BrokenAuditStore())
+    original_error = ValueError("biz exploded")
+
+    def fake_run_scenario(scenario: str, payload: dict[str, object]) -> dict[str, object]:
+        raise original_error
+
+    with pytest.raises(RuntimeError) as exc_info:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr("velaris_agent.velaris.orchestrator.run_scenario", fake_run_scenario)
+            orchestrator.execute(
+                query="我每月 OpenAI 成本 2000 美元，想降到 800",
+                constraints={"target_monthly_cost": 800},
+                payload={
+                    "current_monthly_cost": 2000,
+                    "target_monthly_cost": 800,
+                    "suggestions": [],
+                },
+                session_id="session-audit-error",
+            )
+
+    error_payload = exc_info.value.args[0]
+    assert error_payload["task"]["status"] == "failed"
+    assert error_payload["outcome"]["success"] is False
+    assert error_payload["outcome"]["summary"] == "biz exploded"
+    assert error_payload["audit_event_count"] == 0
+
+
+def test_orchestrator_appends_operator_trace_summary_into_audit_payload() -> None:
+    """编排器应把 procurement operator trace 摘要写进完成审计事件。"""
+
+    class InMemoryAuditStore:
+        """用于捕获编排器审计 payload 的最小仓储。"""
+
+        def __init__(self) -> None:
+            self.events: list[dict[str, object]] = []
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            self.events.append(
+                {
+                    "session_id": session_id,
+                    "step_name": step_name,
+                    "operator_id": operator_id,
+                    "payload": dict(payload or {}),
+                }
+            )
+
+    audit_store = InMemoryAuditStore()
+    orchestrator = VelarisBizOrchestrator(audit_store=audit_store)
+
+    result = orchestrator.execute(
+        query="比较三家供应商，预算不超过 130000，必须通过合规审计。",
+        scenario="procurement",
+        payload={
+            "query": "比较三家供应商，预算不超过 130000，必须通过合规审计。",
+            "budget_max": 130000,
+            "require_compliance": True,
+            "options": [
+                {
+                    "id": "vendor-a",
+                    "label": "供应商 A",
+                    "price_cny": 118000,
+                    "delivery_days": 9,
+                    "quality_score": 0.90,
+                    "compliance_score": 0.98,
+                    "risk_score": 0.10,
+                    "available": True,
+                    "evidence_refs": ["quote://vendor-a", "policy://approved-vendors"],
+                }
+            ],
+        },
+        constraints={"requires_audit": True},
+        session_id="session-procurement-phase2",
+    )
+
+    assert result["audit_event_count"] == 2
+    assert result["result"]["operator_trace"][0]["operator_id"] == "intent"
+    assert result["result"]["audit_trace"]["audit_event"]["operator_id"] == "explanation"
+    completed_payload = audit_store.events[1]["payload"]
+    assert completed_payload["operator_trace_summary"][0]["operator_id"] == "intent"

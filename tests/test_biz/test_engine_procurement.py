@@ -100,3 +100,69 @@ def test_run_procurement_scenario_returns_structured_recommendation() -> None:
         "bias_audit",
         "explanation",
     ]
+
+
+def test_run_procurement_scenario_preserves_frontier_explanation_and_dominated_tail() -> None:
+    """采购 legacy 协议应保留 Pareto 解释，并把 dominated feasible options 挂在尾部。"""
+
+    result = run_scenario(
+        scenario="procurement",
+        payload={
+            "query": "比较三家供应商，质量优先，但仍需满足预算和合规要求。",
+            "budget_max": 250000,
+            "require_compliance": True,
+            "decision_weights": {
+                "cost": 0.10,
+                "quality": 0.60,
+                "delivery": 0.10,
+                "compliance": 0.10,
+                "risk": 0.10,
+            },
+            "options": [
+                {
+                    "id": "budget-choice",
+                    "label": "低价方案",
+                    "price_cny": 100000,
+                    "delivery_days": 7,
+                    "quality_score": 0.70,
+                    "compliance_score": 0.95,
+                    "risk_score": 0.10,
+                    "available": True,
+                },
+                {
+                    "id": "premium-choice",
+                    "label": "高质量方案",
+                    "price_cny": 170000,
+                    "delivery_days": 7,
+                    "quality_score": 0.95,
+                    "compliance_score": 0.95,
+                    "risk_score": 0.10,
+                    "available": True,
+                },
+                {
+                    "id": "dominated-choice",
+                    "label": "被支配方案",
+                    "price_cny": 175000,
+                    "delivery_days": 8,
+                    "quality_score": 0.90,
+                    "compliance_score": 0.95,
+                    "risk_score": 0.12,
+                    "available": True,
+                },
+            ],
+        },
+    )
+
+    assert result["recommended"]["id"] == "premium-choice"
+    assert result["accepted_option_ids"] == [
+        "budget-choice",
+        "premium-choice",
+        "dominated-choice",
+    ]
+    assert [item["id"] for item in result["options"]] == [
+        "premium-choice",
+        "budget-choice",
+        "dominated-choice",
+    ]
+    assert "Pareto 前沿" in result["explanation"]
+    assert "2 个处于 Pareto 前沿" in result["summary"]
