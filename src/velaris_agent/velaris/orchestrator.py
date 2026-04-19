@@ -38,7 +38,7 @@ class AuditStore(Protocol):
     """编排器可接受的最小审计仓储协议。
 
     这里仅约束编排器真正需要的 append 能力，
-    让 PostgreSQL 仓储与未来其他实现都能以最小成本接入。
+    让 SQLite 仓储与未来其他实现都能以最小成本接入。
     """
 
     def append_event(
