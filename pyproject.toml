@@ -63,4 +63,5 @@ strict = true
 [dependency-groups]
 dev = [
     "hypothesis>=6.151.14",
+    "ruff>=0.5.0",
 ]

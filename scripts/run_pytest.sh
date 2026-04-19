@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# 确保 tests 运行时优先使用当前工作区的 src/ 代码，
+# 避免系统环境中存在其他 editable 安装导致导入到错误目录。
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:$PYTHONPATH}"
+
 # 统一 pytest 入口，优先选择与已安装 wheel 架构一致的解释器。
 # 这样可以避免 Apple Silicon 上默认 x86_64 解释器误加载 arm64 扩展导致的 ImportError。
 
