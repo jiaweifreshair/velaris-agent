@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from openharness.tools.base import ToolExecutionContext, ToolResult
+from openharness.tools.base import ToolExecutionContext
 from openharness.tools.skills_hub_tool import SkillsHubInput, SkillsHubTool
 
 

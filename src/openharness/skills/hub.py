@@ -13,15 +13,23 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import logging
 import os
 import re
+import shutil
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
 from pydantic import BaseModel
+
+from openharness.skills.guard import scan_skill as guard_scan_skill
+from openharness.skills.guard import should_allow_install
+from openharness.skills.loader import get_user_skills_dir
+from openharness.skills.lock import HubLockFile, LockEntry
 
 logger = logging.getLogger(__name__)
 
@@ -439,15 +447,6 @@ class OptionalSkillSource(SkillSource):
 # ---------------------------------------------------------------------------
 # Hub operation functions
 # ---------------------------------------------------------------------------
-
-import json
-import shutil
-from datetime import datetime, timezone
-
-from openharness.skills.guard import scan_skill as guard_scan_skill
-from openharness.skills.guard import should_allow_install
-from openharness.skills.loader import get_user_skills_dir
-from openharness.skills.lock import HubLockFile, LockEntry
 
 
 def ensure_hub_dirs() -> tuple[Path, Path]:

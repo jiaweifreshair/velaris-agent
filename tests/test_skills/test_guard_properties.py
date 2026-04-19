@@ -7,13 +7,12 @@ Tests cover:
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from openharness.skills.guard import (
-    THREAT_PATTERNS,
     Finding,
     ScanResult,
     scan_file,

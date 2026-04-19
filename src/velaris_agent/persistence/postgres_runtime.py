@@ -14,6 +14,7 @@ from uuid import uuid4
 from velaris_agent.persistence.postgres import postgres_connection
 from velaris_agent.persistence.psycopg_compat import Jsonb
 from velaris_agent.velaris.outcome_store import OutcomeRecord, OutcomeStore
+from velaris_agent.velaris.payload_redactor import PayloadRedactor
 from velaris_agent.velaris.task_ledger import TaskLedger, TaskLedgerRecord
 
 
@@ -66,6 +67,7 @@ class _PostgresPayloadStore:
 
         self._postgres_dsn = postgres_dsn
         self._table_name = table_name
+        self._payload_redactor = PayloadRedactor()
 
     def _upsert_payload(self, record_id: str, created_at: Any, payload: dict[str, Any]) -> None:
         """按最小 schema 写入或覆盖一条 payload 记录。"""
@@ -244,14 +246,15 @@ class PostgresOutcomeStore(OutcomeStore, _PostgresPayloadStore):
         """写入一条 outcome 快照并返回标准化记录。"""
 
         created_at_value = datetime.now(UTC)
+        redacted_metrics = self._payload_redactor.redact_mapping(metrics or {})
         record = OutcomeRecord(
             session_id=session_id,
             scenario=scenario,
             selected_strategy=selected_strategy,
             success=success,
             reason_codes=reason_codes,
-            summary=summary,
-            metrics=metrics or {},
+            summary=self._payload_redactor.redact_text(summary),
+            metrics=redacted_metrics,
             created_at=created_at_value.isoformat(),
         )
         record_id = f"outcome-{uuid4().hex[:12]}"
@@ -285,12 +288,13 @@ class AuditEventStore(_PostgresPayloadStore):
         """追加一条审计事件，记录编排关键步骤发生了什么。"""
 
         created_at_value = datetime.now(UTC)
+        redacted_payload = self._payload_redactor.redact_mapping(payload or {})
         event = AuditEventRecord(
             event_id=f"audit-{uuid4().hex[:12]}",
             session_id=session_id,
             step_name=step_name,
             operator_id=operator_id,
-            payload=payload or {},
+            payload=redacted_payload,
             created_at=created_at_value.isoformat(),
         )
         self._upsert_payload(event.event_id, created_at_value, event.to_dict())

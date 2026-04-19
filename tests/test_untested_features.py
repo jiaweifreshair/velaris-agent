@@ -15,6 +15,7 @@ import os
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 import pytest
@@ -66,12 +67,16 @@ def collect(events):
     )
     r = {"text": "", "tools": [], "tool_results": [], "turns": 0, "in_tok": 0, "out_tok": 0}
     for ev in events:
-        if isinstance(ev, AssistantTextDelta): r["text"] += ev.text
-        elif isinstance(ev, ToolExecutionStarted): r["tools"].append(ev.tool_name)
+        if isinstance(ev, AssistantTextDelta):
+            r["text"] += ev.text
+        elif isinstance(ev, ToolExecutionStarted):
+            r["tools"].append(ev.tool_name)
         elif isinstance(ev, ToolExecutionCompleted):
             r["tool_results"].append({"tool": ev.tool_name, "ok": not ev.is_error, "out": ev.output[:300]})
         elif isinstance(ev, AssistantTurnComplete):
-            r["turns"] += 1; r["in_tok"] += ev.usage.input_tokens; r["out_tok"] += ev.usage.output_tokens
+            r["turns"] += 1
+            r["in_tok"] += ev.usage.input_tokens
+            r["out_tok"] += ev.usage.output_tokens
     return r
 
 
@@ -84,7 +89,7 @@ async def run_test(name, coro):
     except Exception as e:
         RESULTS[name] = False
         print(f"  >>> EXCEPTION: {e}")
-        import traceback; traceback.print_exc()
+        traceback.print_exc()
 
 
 # ====================================================================
@@ -211,8 +216,10 @@ async def test_hooks_in_agent_loop():
 
     text, tools, blocked = "", [], False
     async for event, usage in run_query(ctx, messages):
-        if isinstance(event, AssistantTextDelta): text += event.text
-        elif isinstance(event, ToolExecutionStarted): tools.append(event.tool_name)
+        if isinstance(event, AssistantTextDelta):
+            text += event.text
+        elif isinstance(event, ToolExecutionStarted):
+            tools.append(event.tool_name)
         elif isinstance(event, ToolExecutionCompleted):
             if event.is_error and "hook" in event.output.lower():
                 blocked = True
@@ -375,7 +382,7 @@ async def test_session_storage():
     """Test session save/load/list/export cycle."""
     from openharness.services.session_storage import (
         save_session_snapshot, load_session_snapshot,
-        list_session_snapshots, export_session_markdown,
+        list_session_snapshots, load_session_by_id, export_session_markdown,
     )
     from openharness.engine.messages import ConversationMessage, TextBlock
     from openharness.api.usage import UsageSnapshot
@@ -405,7 +412,8 @@ async def test_session_storage():
         print(f"  Loaded: model={loaded.get('model')}, messages={len(loaded.get('messages', []))}")
 
         # Load by ID
-        by_id = load_session_by_id(tmpdir, "test-session-123") if "load_session_by_id" in dir() else None
+        loaded_by_id = load_session_by_id(tmpdir, "test-session-123")
+        print(f"  Loaded by id: {loaded_by_id is not None}")
 
         # Export markdown
         md_path = export_session_markdown(cwd=tmpdir, messages=messages)
@@ -683,8 +691,10 @@ async def test_combined_hooks_skills_agent():
 
     text, tools = "", []
     async for event, usage in run_query(ctx, messages):
-        if isinstance(event, AssistantTextDelta): text += event.text
-        elif isinstance(event, ToolExecutionStarted): tools.append(event.tool_name)
+        if isinstance(event, AssistantTextDelta):
+            text += event.text
+        elif isinstance(event, ToolExecutionStarted):
+            tools.append(event.tool_name)
 
     print(f"  Tools used: {tools}")
     print(f"  Response: {text[:200]}")

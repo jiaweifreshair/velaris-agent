@@ -54,5 +54,7 @@ def test_velaris_agent_namespace_exports_orchestrator():
         },
     )
 
-    assert result["plan"]["scenario"] == "tokencost"
-    assert result["routing"]["selected_strategy"] == "local_closed_loop"
+    assert result["session_id"] is not None
+    assert result["envelope"]["plan"]["scenario"] == "tokencost"
+    assert result["envelope"]["routing"]["selected_strategy"] == "local_closed_loop"
+    assert result["envelope"]["execution"]["gate_status"] == "allowed"

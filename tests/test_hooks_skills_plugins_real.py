@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 import pytest
@@ -36,11 +37,15 @@ def collect(events):
     )
     r = {"text": "", "tools": [], "tool_errors": [], "turns": 0}
     for ev in events:
-        if isinstance(ev, AssistantTextDelta): r["text"] += ev.text
-        elif isinstance(ev, ToolExecutionStarted): r["tools"].append(ev.tool_name)
+        if isinstance(ev, AssistantTextDelta):
+            r["text"] += ev.text
+        elif isinstance(ev, ToolExecutionStarted):
+            r["tools"].append(ev.tool_name)
         elif isinstance(ev, ToolExecutionCompleted):
-            if ev.is_error: r["tool_errors"].append({"tool": ev.tool_name, "err": ev.output[:200]})
-        elif isinstance(ev, AssistantTurnComplete): r["turns"] += 1
+            if ev.is_error:
+                r["tool_errors"].append({"tool": ev.tool_name, "err": ev.output[:200]})
+        elif isinstance(ev, AssistantTurnComplete):
+            r["turns"] += 1
     return r
 
 
@@ -458,9 +463,7 @@ def process_v2(data):
             content = refactored.read_text()
             print(f"  Refactored file: {len(content)} chars")
             # Should have merged the two identical functions
-            has_single_func = content.count("def process") >= 1
         else:
-            has_single_func = False
             print("  Refactored file: NOT CREATED")
 
         # Config should be untouched
@@ -606,7 +609,7 @@ async def main():
         except Exception as e:
             RESULTS[name] = (False, time.time() - t0)
             print(f"\n  EXCEPTION: {e}")
-            import traceback; traceback.print_exc()
+            traceback.print_exc()
 
     print(f"\n{'='*70}")
     print("  FINAL RESULTS — Hooks/Skills/Plugins in Real Agent Loops")

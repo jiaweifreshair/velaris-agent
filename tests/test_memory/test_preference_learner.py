@@ -233,7 +233,7 @@ class TestComputeAlignmentBackwardCompatibility:
 
     def test_all_fields_populated(self, tmp_path: Path) -> None:
         """AlignmentReport has all required fields populated."""
-        from velaris_agent.memory.types import AlignmentReport, OrgPolicy
+        from velaris_agent.memory.types import OrgPolicy
 
         mem = DecisionMemory(base_dir=tmp_path / "decisions")
         learner = PreferenceLearner(mem)

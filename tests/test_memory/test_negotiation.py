@@ -13,7 +13,6 @@ from velaris_agent.memory.types import (
     Conflict,
     InterestDimension,
     OrgPolicy,
-    PairwiseAlignment,
     PreferenceDirection,
     Stakeholder,
     StakeholderMapModel,

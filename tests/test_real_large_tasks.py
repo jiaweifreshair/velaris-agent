@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 import pytest
@@ -67,12 +68,16 @@ def collect(events):
     )
     r = {"text": "", "tools": [], "tool_outputs": [], "turns": 0, "in_tok": 0, "out_tok": 0}
     for ev in events:
-        if isinstance(ev, AssistantTextDelta): r["text"] += ev.text
-        elif isinstance(ev, ToolExecutionStarted): r["tools"].append(ev.tool_name)
+        if isinstance(ev, AssistantTextDelta):
+            r["text"] += ev.text
+        elif isinstance(ev, ToolExecutionStarted):
+            r["tools"].append(ev.tool_name)
         elif isinstance(ev, ToolExecutionCompleted):
             r["tool_outputs"].append({"tool": ev.tool_name, "ok": not ev.is_error, "out": ev.output[:200]})
         elif isinstance(ev, AssistantTurnComplete):
-            r["turns"] += 1; r["in_tok"] += ev.usage.input_tokens; r["out_tok"] += ev.usage.output_tokens
+            r["turns"] += 1
+            r["in_tok"] += ev.usage.input_tokens
+            r["out_tok"] += ev.usage.output_tokens
     return r
 
 
@@ -135,7 +140,7 @@ async def task_security_audit_with_hooks():
 
     # Check hook log
     hook_log = log_file.read_text() if log_file.exists() else ""
-    hook_entries = [l for l in hook_log.strip().split("\n") if l.strip()]
+    hook_entries = [line for line in hook_log.strip().split("\n") if line.strip()]
     print(f"  Hook log: {len(hook_entries)} entries")
     if hook_entries:
         print(f"    First: {hook_entries[0]}")
@@ -197,8 +202,6 @@ async def task_coordinator_code_review():
             mgr.create_team("review-team", "Code review team for AutoAgent")
 
             # Phase 1: Spawn 2 worker agents with different review focuses
-            worker_results = {}
-
             async def run_reviewer(name, prompt):
                 reg = ToolRegistry()
                 for t in [BashTool(), FileReadTool(), GlobTool(), GrepTool()]:
@@ -775,14 +778,13 @@ async def main():
         except Exception as e:
             RESULTS[name] = (False, time.time() - t0)
             print(f"\n  >>> EXCEPTION: {e}")
-            import traceback; traceback.print_exc()
+            traceback.print_exc()
 
     print(f"\n{'='*70}")
     print("  FINAL RESULTS — Real Large Tasks")
     print(f"{'='*70}")
     passed = sum(1 for ok, _ in RESULTS.values() if ok)
     for name, (ok, elapsed) in RESULTS.items():
-        features = name.split("(")[1].rstrip(")") if "(" in name else ""
         print(f"  {'PASS' if ok else 'FAIL'}  {name}  [{elapsed:.1f}s]")
     print(f"\n  {passed}/{len(RESULTS)} tasks passed")
 

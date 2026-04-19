@@ -13,6 +13,7 @@ __all__ = [
     "bootstrap_schema",
     "build_bootstrap_statements",
     "factory",
+    "postgres_execution",
     "postgres_connection",
 ]
 
@@ -30,4 +31,6 @@ def __getattr__(name: str):
         return postgres_connection
     if name == "factory":
         return import_module("velaris_agent.persistence.factory")
+    if name == "postgres_execution":
+        return import_module("velaris_agent.persistence.postgres_execution")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

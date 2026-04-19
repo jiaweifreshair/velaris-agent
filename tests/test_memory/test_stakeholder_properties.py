@@ -6,19 +6,36 @@ All property tests for this feature live in this file.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import mkdtemp
 
+from pydantic import ValidationError
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from velaris_agent.biz.engine import _SCENARIO_WEIGHTS, build_capability_plan
+from velaris_agent.memory.conflict_engine import ConflictDetectionEngine
+from velaris_agent.memory.decision_memory import DecisionMemory
+from velaris_agent.memory.negotiation import NegotiationStrategy
+from velaris_agent.memory.preference_learner import PreferenceLearner
+from velaris_agent.memory.stakeholder import DecisionCurveTracker, StakeholderRegistry
+from velaris_agent.memory.stakeholder_map import StakeholderMapBuilder
 from velaris_agent.memory.types import (
+    AlignmentReport,
     Conflict,
+    DecisionActor,
+    DecisionCurvePoint,
+    DecisionRecord,
     InterestDimension,
+    OrgPolicy,
     PairwiseAlignment,
     PreferenceDirection,
     Stakeholder,
     StakeholderMapModel,
     StakeholderRole,
+    UserPreferences,
 )
 
 
@@ -225,10 +242,6 @@ class TestProperty28SerializationRoundTrip:
             f"First:  {first_json[:200]}...\n"
             f"Second: {second_json[:200]}..."
         )
-
-
-from velaris_agent.memory.stakeholder import StakeholderRegistry
-
 
 # ---------------------------------------------------------------------------
 # Property 1: Stakeholder structural completeness
@@ -605,12 +618,6 @@ class TestProperty9ReferentialIntegrityOnRemove:
         assert retrieved is not None
         assert retrieved.active is False
 
-
-import json
-
-from pydantic import ValidationError
-
-
 # ---------------------------------------------------------------------------
 # Property 29: Parser rejects missing required fields
 # Feature: stakeholder-mapping, Property 29: Parser rejects missing required fields
@@ -741,13 +748,6 @@ class TestProperty30ParserRejectsInvalidFieldTypes:
                 f"Bad value: {bad_value!r}\n"
                 f"Error: {error_str}"
             )
-
-
-from itertools import combinations
-
-from velaris_agent.memory.stakeholder_map import StakeholderMapBuilder
-from velaris_agent.memory.types import AlignmentReport
-
 
 # ---------------------------------------------------------------------------
 # Shared strategy: batch of stakeholders sharing one scenario with unique IDs
@@ -1006,10 +1006,6 @@ class TestProperty34TwoPartyExportProducesValidAlignmentReport:
             assert dim_name in shared, (
                 f"Conflict dimension '{dim_name}' not in shared dims {shared}"
             )
-
-
-from velaris_agent.memory.conflict_engine import ConflictDetectionEngine
-
 
 # ---------------------------------------------------------------------------
 # Shared strategies for ConflictDetectionEngine property tests
@@ -1404,11 +1400,6 @@ class TestProperty17ConflictsSortedBySeverityDescending:
                 f"conflicts[{i}].severity={conflicts[i].severity} < "
                 f"conflicts[{i + 1}].severity={conflicts[i + 1].severity}"
             )
-
-
-from velaris_agent.memory.negotiation import NegotiationStrategy
-from velaris_agent.memory.types import NegotiationProposal, OrgPolicy
-
 
 # ---------------------------------------------------------------------------
 # Property 18: One proposal per conflicting dimension
@@ -1847,10 +1838,6 @@ class TestProperty21HardConstraintNonNegotiability:
             f"to be 0.0, got {org_concession}"
         )
 
-
-from velaris_agent.biz.engine import build_capability_plan, _SCENARIO_WEIGHTS
-
-
 # ---------------------------------------------------------------------------
 # Shared strategies for engine integration property tests
 # ---------------------------------------------------------------------------
@@ -2196,11 +2183,6 @@ class TestProperty24NoStakeholderMapPreservesExistingBehavior:
             "stakeholder_context should not be present when stakeholder_map is omitted"
         )
 
-
-from velaris_agent.memory.stakeholder import DecisionCurveTracker
-from velaris_agent.memory.types import DecisionActor, DecisionCurvePoint, DecisionRecord
-
-
 # ---------------------------------------------------------------------------
 # Property 25: Per-stakeholder curve point completeness
 # Feature: stakeholder-mapping, Property 25: Per-stakeholder curve point completeness
@@ -2490,10 +2472,6 @@ class TestProperty27ConvergenceAndDivergenceTrendDetection:
             f"{scores}, got '{trend}'"
         )
 
-
-from velaris_agent.memory.types import OrgPolicy, UserPreferences
-
-
 # ---------------------------------------------------------------------------
 # Shared strategies for migration helper property tests
 # ---------------------------------------------------------------------------
@@ -2685,15 +2663,6 @@ class TestProperty32OrgPolicyMigrationPreservesWeightsAndConstraints:
 # Property 33: compute_alignment backward compatibility
 # Feature: stakeholder-mapping, Property 33: compute_alignment backward compatibility
 # ---------------------------------------------------------------------------
-
-
-from pathlib import Path
-from tempfile import mkdtemp
-
-from velaris_agent.memory.decision_memory import DecisionMemory
-from velaris_agent.memory.preference_learner import PreferenceLearner
-
-
 class TestProperty33ComputeAlignmentBackwardCompatibility:
     """**Validates: Requirements 9.3**"""
 

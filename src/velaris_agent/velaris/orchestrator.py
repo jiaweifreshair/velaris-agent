@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
+from openharness.config.settings import load_settings
 from velaris_agent.biz.engine import build_capability_plan, run_scenario
 from velaris_agent.memory.types import StakeholderMapModel
+from velaris_agent.persistence.factory import (
+    build_audit_store,
+    build_execution_repository,
+    build_outcome_store,
+    build_session_repository,
+    build_task_ledger,
+)
 from velaris_agent.velaris.authority import AuthorityService
+from velaris_agent.velaris.execution_contract import (
+    AuditSummary,
+    BizExecutionRecord,
+    DecisionExecutionEnvelope,
+    DecisionExecutionRequest,
+    GovernanceGateDecision,
+)
+from velaris_agent.velaris.failure_classifier import PersistenceFailureClassifier
 from velaris_agent.velaris.outcome_store import OutcomeStore
+from velaris_agent.velaris.persistence_barrier import (
+    PreExecutionPersistenceBarrier,
+    PreExecutionPersistenceError,
+)
 from velaris_agent.velaris.router import PolicyRouter
 from velaris_agent.velaris.task_ledger import TaskLedger
 
@@ -40,13 +61,40 @@ class VelarisBizOrchestrator:
         task_ledger: TaskLedger | None = None,
         outcome_store: OutcomeStore | None = None,
         audit_store: AuditStore | None = None,
+        session_repository: Any | None = None,
+        execution_repository: Any | None = None,
+        persistence_barrier: PreExecutionPersistenceBarrier | None = None,
+        failure_classifier: PersistenceFailureClassifier | None = None,
+        postgres_dsn: str | None = None,
     ) -> None:
         """初始化编排器及其依赖。"""
+        resolved_postgres_dsn = postgres_dsn
+        if resolved_postgres_dsn is None:
+            resolved_postgres_dsn = load_settings().storage.postgres_dsn.strip()
         self.router = router or PolicyRouter()
         self.authority_service = authority_service or AuthorityService()
-        self.task_ledger = task_ledger or TaskLedger()
-        self.outcome_store = outcome_store or OutcomeStore()
-        self.audit_store = audit_store
+        self.task_ledger = task_ledger or build_task_ledger(resolved_postgres_dsn)
+        self.outcome_store = outcome_store or build_outcome_store(resolved_postgres_dsn)
+        self.audit_store = audit_store if audit_store is not None else build_audit_store(resolved_postgres_dsn)
+        self.session_repository = (
+            session_repository
+            if session_repository is not None
+            else build_session_repository(resolved_postgres_dsn)
+        )
+        self.execution_repository = (
+            execution_repository
+            if execution_repository is not None
+            else build_execution_repository(resolved_postgres_dsn)
+        )
+        self.failure_classifier = failure_classifier or PersistenceFailureClassifier()
+        self.persistence_barrier = persistence_barrier
+        if self.persistence_barrier is None and self.execution_repository is not None:
+            self.persistence_barrier = PreExecutionPersistenceBarrier(
+                session_repository=self.session_repository,
+                execution_repository=self.execution_repository,
+                audit_store=self.audit_store,
+                failure_classifier=self.failure_classifier,
+            )
 
     def execute(
         self,
@@ -58,7 +106,13 @@ class VelarisBizOrchestrator:
     ) -> dict[str, Any]:
         """执行一次完整的 Velaris 业务闭环。"""
         resolved_session_id = session_id or f"session-{uuid4().hex[:12]}"
-        audit_event_count = 0
+        request = DecisionExecutionRequest(
+            query=query,
+            payload=payload,
+            constraints=constraints or {},
+            scenario_hint=scenario,
+            session_id=resolved_session_id,
+        )
         stakeholder_map = _resolve_stakeholder_map(payload)
         plan = build_capability_plan(
             query=query,
@@ -71,12 +125,130 @@ class VelarisBizOrchestrator:
             scenario_payload["stakeholder_context"] = plan["stakeholder_context"]
         if "decision_weights" not in scenario_payload and "decision_weights" in plan:
             scenario_payload["decision_weights"] = plan["decision_weights"]
-        audit_required = bool(plan.get("governance", {}).get("requires_audit", False))
         routing = self.router.route(plan=plan, query=query)
         authority = self.authority_service.issue_plan(
             required_capabilities=routing.required_capabilities,
             governance=plan["governance"],
         )
+        gate_decision = self._build_gate_decision(plan=plan, routing=routing.to_dict(), authority=authority.to_dict())
+        execution = self._build_execution_record(
+            session_id=resolved_session_id,
+            scenario=str(plan["scenario"]),
+            gate_decision=gate_decision,
+        )
+
+        if gate_decision.gate_status == "denied":
+            audit_event_count = 0
+            try:
+                audit_event_count += self._append_audit_event(
+                    session_id=resolved_session_id,
+                    step_name="orchestrator.blocked",
+                    payload={
+                        "execution_id": execution.execution_id,
+                        "scenario": plan["scenario"],
+                        "selected_strategy": routing.selected_strategy,
+                        "reason": gate_decision.reason,
+                    },
+                    required=gate_decision.requires_forced_audit,
+                )
+            except RuntimeError as exc:
+                failure_payload = self._build_envelope(
+                    execution=self._replace_execution(
+                        execution,
+                        execution_status="blocked",
+                        audit_status="failed",
+                    ),
+                    plan=plan,
+                    routing=routing.to_dict(),
+                    authority=authority.to_dict(),
+                    gate_decision=gate_decision,
+                    tasks=[],
+                    outcome={
+                        "success": False,
+                        "summary": str(exc),
+                        "reason_codes": ["gate_denied"],
+                    },
+                    result={},
+                    audit_summary=AuditSummary(
+                        audit_required=gate_decision.requires_forced_audit,
+                        audit_event_count=0,
+                        degraded_mode=gate_decision.degraded_mode,
+                        audit_status="failed",
+                        last_event=None,
+                    ),
+                )
+                raise RuntimeError(failure_payload) from exc
+
+            return self._build_envelope(
+                execution=self._replace_execution(
+                    execution,
+                    execution_status="blocked",
+                    audit_status="persisted" if audit_event_count else "not_required",
+                ),
+                plan=plan,
+                routing=routing.to_dict(),
+                authority=authority.to_dict(),
+                gate_decision=gate_decision,
+                tasks=[],
+                outcome={
+                    "success": False,
+                    "summary": gate_decision.reason,
+                    "reason_codes": ["gate_denied"],
+                },
+                result={},
+                audit_summary=AuditSummary(
+                    audit_required=gate_decision.requires_forced_audit,
+                    audit_event_count=audit_event_count,
+                    degraded_mode=gate_decision.degraded_mode,
+                    audit_status="persisted" if audit_event_count else "not_required",
+                    last_event="orchestrator.blocked" if audit_event_count else None,
+                ),
+            )
+
+        audit_event_count = 0
+        if self.persistence_barrier is not None:
+            try:
+                barrier_result = self.persistence_barrier.persist(
+                    request=request,
+                    execution=execution,
+                    gate_decision=gate_decision,
+                    session_snapshot={"cwd": resolved_session_id, "query": query},
+                    execution_snapshot={
+                        "plan": plan,
+                        "routing": routing.to_dict(),
+                        "authority": authority.to_dict(),
+                    },
+                )
+            except PreExecutionPersistenceError as exc:
+                failure_payload = self._build_envelope(
+                    execution=self._replace_execution(
+                        execution,
+                        execution_status="blocked",
+                        audit_status="failed",
+                    ),
+                    plan=plan,
+                    routing=routing.to_dict(),
+                    authority=authority.to_dict(),
+                    gate_decision=gate_decision,
+                    tasks=[],
+                    outcome={
+                        "success": False,
+                        "summary": exc.classification.message,
+                        "reason_codes": [exc.classification.error_code],
+                    },
+                    result={"error": exc.to_dict()},
+                    audit_summary=AuditSummary(
+                        audit_required=gate_decision.requires_forced_audit,
+                        audit_event_count=0,
+                        degraded_mode=gate_decision.degraded_mode,
+                        audit_status="failed",
+                        last_event=None,
+                    ),
+                )
+                raise RuntimeError(failure_payload) from exc
+            execution = barrier_result.execution_record
+            audit_event_count += barrier_result.audit_event_count
+
         task = self.task_ledger.create_task(
             session_id=resolved_session_id,
             runtime=routing.selected_route.runtime,
@@ -84,18 +256,20 @@ class VelarisBizOrchestrator:
             objective=query,
         )
         self.task_ledger.update_status(task.task_id, "running")
+
         try:
             audit_event_count += self._append_audit_event(
                 session_id=resolved_session_id,
                 step_name="orchestrator.routed",
                 payload={
                     "task_id": task.task_id,
+                    "execution_id": execution.execution_id,
                     "scenario": plan["scenario"],
                     "selected_strategy": routing.selected_strategy,
                     "runtime": routing.selected_route.runtime,
                     "approvals_required": authority.approvals_required,
                 },
-                required=audit_required,
+                required=False,
             )
             scenario_result = run_scenario(plan["scenario"], scenario_payload)
             audit_event_count += self._append_audit_event(
@@ -103,6 +277,7 @@ class VelarisBizOrchestrator:
                 step_name="orchestrator.completed",
                 payload={
                     "task_id": task.task_id,
+                    "execution_id": execution.execution_id,
                     "scenario": plan["scenario"],
                     "selected_strategy": routing.selected_strategy,
                     "success": True,
@@ -116,7 +291,7 @@ class VelarisBizOrchestrator:
                         for item in scenario_result.get("operator_trace", [])
                     ],
                 },
-                required=audit_required,
+                required=False,
             )
         except Exception as exc:
             failed_task = self.task_ledger.update_status(task.task_id, "failed", error=str(exc))
@@ -140,16 +315,52 @@ class VelarisBizOrchestrator:
                 },
                 required=False,
             )
+            failure_execution = self._replace_execution(
+                execution,
+                execution_status="failed",
+                audit_status=self._finalize_audit_status(
+                    gate_decision=gate_decision,
+                    audit_event_count=audit_event_count,
+                ),
+            )
+            if self.execution_repository is not None:
+                self.execution_repository.update_status(
+                    failure_execution.execution_id,
+                    execution_status=failure_execution.execution_status,
+                    gate_status=failure_execution.gate_status,
+                    effective_risk_level=failure_execution.effective_risk_level,
+                    degraded_mode=failure_execution.degraded_mode,
+                    audit_status=failure_execution.audit_status,
+                    structural_complete=failure_execution.structural_complete,
+                    constraint_complete=failure_execution.constraint_complete,
+                    goal_complete=failure_execution.goal_complete,
+                    resume_cursor=failure_execution.resume_cursor,
+                    snapshot_json={
+                        "plan": plan,
+                        "routing": routing.to_dict(),
+                        "authority": authority.to_dict(),
+                        "outcome": outcome.to_dict(),
+                    },
+                    updated_at=failure_execution.updated_at,
+                )
             raise RuntimeError(
-                {
-                    "session_id": resolved_session_id,
-                    "plan": plan,
-                    "routing": routing.to_dict(),
-                    "authority": authority.to_dict(),
-                    "task": failed_task.to_dict() if failed_task is not None else task.to_dict(),
-                    "outcome": outcome.to_dict(),
-                    "audit_event_count": audit_event_count,
-                }
+                self._build_envelope(
+                    execution=failure_execution,
+                    plan=plan,
+                    routing=routing.to_dict(),
+                    authority=authority.to_dict(),
+                    gate_decision=gate_decision,
+                    tasks=[failed_task.to_dict() if failed_task is not None else task.to_dict()],
+                    outcome=outcome.to_dict(),
+                    result={},
+                    audit_summary=AuditSummary(
+                        audit_required=gate_decision.requires_forced_audit,
+                        audit_event_count=audit_event_count,
+                        degraded_mode=gate_decision.degraded_mode,
+                        audit_status=failure_execution.audit_status,
+                        last_event="orchestrator.failed",
+                    ),
+                )
             ) from exc
 
         completed_task = self.task_ledger.update_status(task.task_id, "completed") or task
@@ -166,16 +377,262 @@ class VelarisBizOrchestrator:
                 "contract_ready": scenario_result.get("contract_ready"),
             },
         )
-        return {
-            "session_id": resolved_session_id,
-            "plan": plan,
-            "routing": routing.to_dict(),
-            "authority": authority.to_dict(),
-            "task": completed_task.to_dict(),
-            "outcome": outcome.to_dict(),
-            "result": scenario_result,
-            "audit_event_count": audit_event_count,
-        }
+        completed_execution = self._replace_execution(
+            execution,
+            execution_status=self._final_execution_status(gate_decision=gate_decision),
+            structural_complete=True,
+            constraint_complete=gate_decision.gate_status == "allowed",
+            goal_complete=gate_decision.gate_status == "allowed",
+            audit_status=self._finalize_audit_status(
+                gate_decision=gate_decision,
+                audit_event_count=audit_event_count,
+            ),
+        )
+        if self.execution_repository is not None:
+            self.execution_repository.update_status(
+                completed_execution.execution_id,
+                execution_status=completed_execution.execution_status,
+                gate_status=completed_execution.gate_status,
+                effective_risk_level=completed_execution.effective_risk_level,
+                degraded_mode=completed_execution.degraded_mode,
+                audit_status=completed_execution.audit_status,
+                structural_complete=completed_execution.structural_complete,
+                constraint_complete=completed_execution.constraint_complete,
+                goal_complete=completed_execution.goal_complete,
+                resume_cursor=completed_execution.resume_cursor,
+                snapshot_json={
+                    "plan": plan,
+                    "routing": routing.to_dict(),
+                    "authority": authority.to_dict(),
+                    "result": scenario_result,
+                    "outcome": outcome.to_dict(),
+                },
+                updated_at=completed_execution.updated_at,
+            )
+        return self._build_envelope(
+            execution=completed_execution,
+            plan=plan,
+            routing=routing.to_dict(),
+            authority=authority.to_dict(),
+            gate_decision=gate_decision,
+            tasks=[completed_task.to_dict()],
+            outcome=outcome.to_dict(),
+            result=scenario_result,
+            audit_summary=AuditSummary(
+                audit_required=gate_decision.requires_forced_audit,
+                audit_event_count=audit_event_count,
+                degraded_mode=gate_decision.degraded_mode,
+                audit_status=completed_execution.audit_status,
+                last_event="orchestrator.completed",
+            ),
+        )
+
+    def _build_gate_decision(
+        self,
+        *,
+        plan: dict[str, Any],
+        routing: dict[str, Any],
+        authority: dict[str, Any],
+    ) -> GovernanceGateDecision:
+        """根据 effective risk 生成治理门决策。"""
+
+        effective_risk_level = self._resolve_effective_risk_level(
+            plan=plan,
+            routing=routing,
+            authority=authority,
+        )
+        governance = dict(plan.get("governance", {}))
+        if effective_risk_level == "high":
+            return GovernanceGateDecision(
+                gate_status="denied",
+                effective_risk_level=effective_risk_level,
+                requires_forced_audit=bool(governance.get("requires_audit", False) or authority.get("approvals_required", False)),
+                degraded_mode=False,
+                reason="scenario profile marked request as high risk",
+            )
+        if effective_risk_level == "medium":
+            return GovernanceGateDecision(
+                gate_status="degraded",
+                effective_risk_level=effective_risk_level,
+                requires_forced_audit=True,
+                degraded_mode=True,
+                reason="scenario profile requires audited degraded execution",
+            )
+        return GovernanceGateDecision(
+            gate_status="allowed",
+            effective_risk_level=effective_risk_level,
+            requires_forced_audit=bool(governance.get("requires_audit", False)),
+            degraded_mode=False,
+            reason="safe to proceed",
+        )
+
+    def _resolve_effective_risk_level(
+        self,
+        *,
+        plan: dict[str, Any],
+        routing: dict[str, Any],
+        authority: dict[str, Any],
+    ) -> str:
+        """根据 scenario profile 计算 execution 的 effective risk。
+
+        routing 提供的是基础风险信号，但不是最终真相源。
+        这里优先消费显式风险约束，其次根据场景画像做修正，
+        最后才回退到 routing 原始风险，避免“强审计 = 高风险”被错误硬编码。
+        """
+
+        del authority
+        constraints = dict(plan.get("constraints", {}))
+        explicit_risk_level = self._extract_explicit_risk_level(constraints)
+        if explicit_risk_level is not None:
+            return explicit_risk_level
+
+        scenario = str(plan.get("scenario", "general") or "general")
+        scenario_profile_risk = {
+            "tokencost": "low",
+            "travel": "medium",
+            "lifegoal": "medium",
+            "procurement": "medium",
+            "robotclaw": "high",
+        }.get(scenario)
+        if scenario_profile_risk is not None:
+            return scenario_profile_risk
+
+        base_risk_level = (
+            routing.get("trace", {})
+            .get("routing_context", {})
+            .get("risk", {})
+            .get("level", "medium")
+        )
+        return self._normalize_risk_level(base_risk_level)
+
+    def _extract_explicit_risk_level(self, constraints: dict[str, Any]) -> str | None:
+        """从显式约束中提取风险级别，并统一归一化。"""
+
+        risk_level = constraints.get("risk_level")
+        if risk_level is None:
+            nested_risk = constraints.get("risk")
+            if isinstance(nested_risk, dict):
+                risk_level = nested_risk.get("level")
+        if risk_level is None:
+            return None
+        return self._normalize_risk_level(risk_level)
+
+    def _normalize_risk_level(self, risk_level: Any) -> str:
+        """把外部风险输入收敛到 gate 能消费的 low/medium/high 三档。"""
+
+        normalized = str(risk_level or "medium").strip().lower()
+        if normalized in {"critical", "high"}:
+            return "high"
+        if normalized == "low":
+            return "low"
+        return "medium"
+
+    def _build_execution_record(
+        self,
+        *,
+        session_id: str,
+        scenario: str,
+        gate_decision: GovernanceGateDecision,
+    ) -> BizExecutionRecord:
+        """创建 execution 主记录的初始快照。"""
+
+        timestamp = datetime.now(UTC).isoformat()
+        return BizExecutionRecord(
+            execution_id=f"exec-{uuid4().hex[:12]}",
+            session_id=session_id,
+            scenario=scenario,
+            execution_status="blocked" if gate_decision.gate_status == "denied" else "planned",
+            gate_status=gate_decision.gate_status,
+            effective_risk_level=gate_decision.effective_risk_level,
+            degraded_mode=gate_decision.degraded_mode,
+            audit_status="not_required",
+            structural_complete=False,
+            constraint_complete=False,
+            goal_complete=False,
+            created_at=timestamp,
+            updated_at=timestamp,
+            resume_cursor={"stage": "planned"},
+        )
+
+    def _replace_execution(
+        self,
+        execution: BizExecutionRecord,
+        *,
+        execution_status: str,
+        audit_status: str,
+        structural_complete: bool | None = None,
+        constraint_complete: bool | None = None,
+        goal_complete: bool | None = None,
+    ) -> BizExecutionRecord:
+        """返回更新后的 execution 快照，避免原对象被原地修改。"""
+
+        return BizExecutionRecord(
+            execution_id=execution.execution_id,
+            session_id=execution.session_id,
+            scenario=execution.scenario,
+            execution_status=execution_status,
+            gate_status=execution.gate_status,
+            effective_risk_level=execution.effective_risk_level,
+            degraded_mode=execution.degraded_mode,
+            audit_status=audit_status,
+            structural_complete=execution.structural_complete if structural_complete is None else structural_complete,
+            constraint_complete=execution.constraint_complete if constraint_complete is None else constraint_complete,
+            goal_complete=execution.goal_complete if goal_complete is None else goal_complete,
+            created_at=execution.created_at,
+            updated_at=datetime.now(UTC).isoformat(),
+            resume_cursor=execution.resume_cursor,
+        )
+
+    def _final_execution_status(self, gate_decision: GovernanceGateDecision) -> str:
+        """根据 gate 结果映射最终 execution_status。"""
+
+        if gate_decision.gate_status == "degraded":
+            return "partially_completed"
+        return "completed"
+
+    def _finalize_audit_status(
+        self,
+        *,
+        gate_decision: GovernanceGateDecision,
+        audit_event_count: int,
+    ) -> str:
+        """根据 gate 与审计写入结果收束 audit_status。"""
+
+        if gate_decision.gate_status == "degraded":
+            if self.audit_store is None:
+                return "pending"
+            return "persisted" if audit_event_count > 0 else "failed"
+        if gate_decision.requires_forced_audit:
+            return "persisted" if audit_event_count > 0 else "failed"
+        return "not_required"
+
+    def _build_envelope(
+        self,
+        *,
+        execution: BizExecutionRecord,
+        plan: dict[str, Any],
+        routing: dict[str, Any],
+        authority: dict[str, Any],
+        gate_decision: GovernanceGateDecision,
+        tasks: list[dict[str, Any]],
+        outcome: dict[str, Any] | None,
+        result: dict[str, Any],
+        audit_summary: AuditSummary,
+    ) -> dict[str, Any]:
+        """组装统一 envelope-first 输出并补最小兼容 alias。"""
+
+        envelope = DecisionExecutionEnvelope(
+            execution=execution,
+            plan=plan,
+            routing=routing,
+            authority=authority,
+            gate_decision=gate_decision,
+            tasks=tasks,
+            outcome=outcome,
+            result=result,
+            audit=audit_summary,
+        )
+        return envelope.to_tool_payload()
 
     def _append_audit_event(
         self,

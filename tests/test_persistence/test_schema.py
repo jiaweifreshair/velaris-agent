@@ -21,6 +21,43 @@ def test_build_bootstrap_statements_includes_expected_tables():
         assert f"create table if not exists {table_name}" in lowered
 
 
+def test_build_bootstrap_statements_exposes_explicit_execution_and_session_columns():
+    """execution / session 应升级为显式结构表，而不是继续只保留 payload。"""
+
+    statements = build_bootstrap_statements()
+    execution_sql = next(
+        statement for statement in statements if "create table if not exists execution_records" in statement.lower()
+    )
+    session_sql = next(
+        statement for statement in statements if "create table if not exists session_records" in statement.lower()
+    )
+
+    lowered_execution_sql = execution_sql.lower()
+    lowered_session_sql = session_sql.lower()
+
+    for fragment in (
+        "execution_id text primary key",
+        "session_id text",
+        "execution_status text not null",
+        "gate_status text not null",
+        "effective_risk_level text not null",
+        "degraded_mode boolean not null default false",
+        "audit_status text not null",
+        "resume_cursor jsonb not null default '{}'::jsonb",
+        "snapshot_json jsonb not null default '{}'::jsonb",
+    ):
+        assert fragment in lowered_execution_sql
+
+    for fragment in (
+        "session_id text primary key",
+        "binding_mode text not null",
+        "source_runtime text not null",
+        "message_count integer not null default 0",
+        "snapshot_json jsonb not null default '{}'::jsonb",
+    ):
+        assert fragment in lowered_session_sql
+
+
 def test_persistence_package_import_does_not_require_postgres_driver(monkeypatch):
     """仅导入 persistence 包并生成 bootstrap SQL 时不应强依赖 psycopg。"""
 

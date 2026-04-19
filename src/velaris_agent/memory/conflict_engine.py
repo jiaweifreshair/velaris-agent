@@ -13,7 +13,6 @@ from itertools import combinations
 
 from velaris_agent.memory.types import (
     Conflict,
-    PreferenceDirection,
     Stakeholder,
     StakeholderMapModel,
 )

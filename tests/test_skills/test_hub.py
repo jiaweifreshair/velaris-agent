@@ -3,22 +3,33 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
+from openharness.skills.guard import ScanResult
 from openharness.skills.hub import (
     GitHubAuth,
     OptionalSkillSource,
     SkillBundle,
     SkillMeta,
+    SkillSource,
     _normalize_bundle_path,
     _validate_bundle_rel_path,
     _validate_skill_name,
+    append_audit_log,
     bundle_content_hash,
+    check_for_skill_updates,
     content_hash,
+    install_from_quarantine,
+    install_skill,
+    parallel_search_sources,
+    quarantine_bundle,
+    uninstall_skill,
 )
+from openharness.skills.lock import HubLockFile, LockEntry
 
 
 # ---------------------------------------------------------------------------
@@ -271,23 +282,6 @@ class TestOptionalSkillSource:
 # ---------------------------------------------------------------------------
 # Hub operation function tests (Task 4.3)
 # ---------------------------------------------------------------------------
-
-import json
-import shutil
-from unittest.mock import MagicMock, patch
-
-from openharness.skills.guard import ScanResult
-from openharness.skills.hub import (
-    SkillSource,
-    append_audit_log,
-    install_from_quarantine,
-    install_skill,
-    check_for_skill_updates,
-    parallel_search_sources,
-    quarantine_bundle,
-    uninstall_skill,
-)
-from openharness.skills.lock import HubLockFile, LockEntry
 
 
 # ---------------------------------------------------------------------------

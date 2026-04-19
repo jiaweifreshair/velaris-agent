@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from openharness.skills.lock import HubLockFile, LockEntry
+from openharness.skills.lock import HubLockFile, LockEntry, TapsManager
 
 
 # ---------------------------------------------------------------------------
@@ -276,8 +276,6 @@ class TestListInstalled:
 # ---------------------------------------------------------------------------
 # TapsManager tests  (Req 5.1, 5.3, 5.5)
 # ---------------------------------------------------------------------------
-
-from openharness.skills.lock import TapsManager
 
 
 # ---------------------------------------------------------------------------

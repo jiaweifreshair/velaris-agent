@@ -10,11 +10,13 @@ from velaris_agent.velaris.outcome_store import OutcomeStore
 from velaris_agent.velaris.task_ledger import TaskLedger
 
 if TYPE_CHECKING:
+    from velaris_agent.persistence.postgres_execution import (
+        ExecutionRepository,
+        SessionRepository,
+    )
     from velaris_agent.persistence.job_queue import PostgresJobQueue
     from velaris_agent.persistence.postgres_runtime import (
         AuditEventStore,
-        PostgresOutcomeStore,
-        PostgresTaskLedger,
     )
 
 
@@ -71,6 +73,34 @@ def build_audit_store(postgres_dsn: str = "") -> "AuditEventStore | None":
         from velaris_agent.persistence.postgres_runtime import AuditEventStore
 
         return AuditEventStore(postgres_dsn.strip())
+    return None
+
+
+def build_execution_repository(postgres_dsn: str = "") -> "ExecutionRepository | None":
+    """按配置构建 execution 主记录仓储。
+
+    只有显式提供 PostgreSQL DSN 时才暴露 execution 主线仓储，
+    这样现有未迁移调用方不会被强制拉入新的持久化依赖。
+    """
+
+    if postgres_dsn.strip():
+        from velaris_agent.persistence.postgres_execution import ExecutionRepository
+
+        return ExecutionRepository(postgres_dsn.strip())
+    return None
+
+
+def build_session_repository(postgres_dsn: str = "") -> "SessionRepository | None":
+    """按配置构建 session 主记录仓储。
+
+    该入口为后续 `session_storage.py` PostgreSQL 化预留统一工厂，
+    避免桥接层直接 new 数据库仓储实现。
+    """
+
+    if postgres_dsn.strip():
+        from velaris_agent.persistence.postgres_execution import SessionRepository
+
+        return SessionRepository(postgres_dsn.strip())
     return None
 
 

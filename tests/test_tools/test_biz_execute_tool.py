@@ -60,11 +60,13 @@ async def test_biz_execute_tool_runs_full_tokencost_flow(tmp_path: Path):
 
     payload = json.loads(result.output)
     assert result.is_error is False
-    assert payload["plan"]["scenario"] == "tokencost"
-    assert payload["routing"]["selected_strategy"] == "local_closed_loop"
-    assert payload["authority"]["approvals_required"] is False
+    assert set(payload.keys()) == {"audit_event_count", "envelope", "outcome", "result", "session_id"}
+    assert payload["envelope"]["plan"]["scenario"] == "tokencost"
+    assert payload["envelope"]["routing"]["selected_strategy"] == "local_closed_loop"
+    assert payload["envelope"]["authority"]["approvals_required"] is False
     assert payload["result"]["projected_monthly_cost"] == 1000
-    assert payload["task"]["status"] == "completed"
+    assert payload["envelope"]["execution"]["gate_status"] == "allowed"
+    assert payload["envelope"]["tasks"][0]["status"] == "completed"
     assert payload["outcome"]["success"] is True
 
 
@@ -122,10 +124,12 @@ async def test_biz_execute_tool_runs_full_lifegoal_flow(tmp_path: Path):
 
     payload = json.loads(result.output)
     assert result.is_error is False
-    assert payload["plan"]["scenario"] == "lifegoal"
-    assert payload["routing"]["selected_strategy"] == "local_closed_loop"
-    assert payload["routing"]["stop_profile"] == "balanced"
+    assert set(payload.keys()) == {"audit_event_count", "envelope", "outcome", "result", "session_id"}
+    assert payload["envelope"]["plan"]["scenario"] == "lifegoal"
+    assert payload["envelope"]["routing"]["selected_strategy"] == "local_closed_loop"
+    assert payload["envelope"]["routing"]["stop_profile"] == "balanced"
     assert payload["result"]["domain"] == "career"
     assert payload["result"]["recommended"]["id"] == "offer-b"
-    assert payload["task"]["status"] == "completed"
+    assert payload["envelope"]["execution"]["gate_status"] == "degraded"
+    assert payload["envelope"]["tasks"][0]["status"] == "completed"
     assert payload["outcome"]["success"] is True

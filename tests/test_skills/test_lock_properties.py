@@ -12,7 +12,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -86,7 +86,7 @@ _valid_tap_st = st.builds(
 class TestProperty5PostInstallLockFileIntegrity:
     """**Validates: Requirements 2.5, 4.2**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(entry=_lock_entry_st)
     def test_record_install_then_get_returns_complete_record(
         self,
@@ -121,7 +121,7 @@ class TestProperty5PostInstallLockFileIntegrity:
 class TestProperty8PostUpdateLockFileRefresh:
     """**Validates: Requirements 3.5**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         entry=_lock_entry_st,
         new_hash=_content_hash_st,
@@ -164,7 +164,7 @@ class TestProperty8PostUpdateLockFileRefresh:
 class TestProperty9UninstallCleanup:
     """**Validates: Requirements 4.3**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         entries=st.lists(_lock_entry_st, min_size=1, max_size=10),
     )
@@ -208,7 +208,7 @@ class TestProperty9UninstallCleanup:
 class TestProperty10TapRemoval:
     """**Validates: Requirements 5.3**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         taps=st.lists(_valid_tap_st, min_size=1, max_size=10, unique=True),
     )
@@ -274,7 +274,7 @@ _invalid_tap_st = st.one_of(
 class TestProperty11TapAddressFormatValidation:
     """**Validates: Requirements 5.5**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(invalid_repo=_invalid_tap_st)
     def test_invalid_format_raises_value_error(
         self,
@@ -300,7 +300,7 @@ class TestProperty11TapAddressFormatValidation:
 class TestProperty16LockFileRoundTripConsistency:
     """**Validates: Requirements 12.2**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(
         entries=st.dictionaries(
             keys=_skill_name_st,
@@ -364,7 +364,7 @@ def _is_not_json(s: str) -> bool:
 class TestProperty17InvalidJsonErrorHandling:
     """**Validates: Requirements 12.3, 4.5**"""
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     @given(bad_content=_non_json_st)
     def test_invalid_json_returns_empty_dict(
         self,

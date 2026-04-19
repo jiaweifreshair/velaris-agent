@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from openharness.velaris.orchestrator import VelarisBizOrchestrator
+from velaris_agent.biz.engine import build_capability_plan
 from velaris_agent.memory.types import (
     InterestDimension,
     PreferenceDirection,
@@ -153,10 +154,12 @@ def test_orchestrator_executes_tokencost_flow_with_runtime_controls():
         session_id="session-token",
     )
 
-    assert result["plan"]["scenario"] == "tokencost"
-    assert result["routing"]["selected_strategy"] == "local_closed_loop"
-    assert result["authority"]["approvals_required"] is False
-    assert result["task"]["status"] == "completed"
+    assert result["envelope"]["plan"]["scenario"] == "tokencost"
+    assert result["envelope"]["routing"]["selected_strategy"] == "local_closed_loop"
+    assert result["envelope"]["authority"]["approvals_required"] is False
+    assert result["envelope"]["execution"]["gate_status"] == "allowed"
+    assert result["envelope"]["execution"]["audit_status"] == "not_required"
+    assert result["envelope"]["tasks"][0]["status"] == "completed"
     assert result["result"]["projected_monthly_cost"] == 850
     assert result["outcome"]["success"] is True
     assert result["audit_event_count"] == 0
@@ -217,15 +220,16 @@ def test_orchestrator_executes_robotclaw_flow_with_strict_governance():
         session_id="session-robotclaw",
     )
 
-    assert result["plan"]["scenario"] == "robotclaw"
-    assert result["routing"]["selected_strategy"] == "delegated_robotclaw"
-    assert result["authority"]["approvals_required"] is True
-    assert "audit" in result["authority"]["required_capabilities"]
-    assert result["result"]["recommended"]["id"] == "dispatch-a"
-    assert result["task"]["status"] == "completed"
-    assert result["audit_event_count"] == 2
-    assert result["outcome"]["reason_codes"][0] == "R001_high_risk_go_robotclaw"
-    assert len(audit_store.events) == 2
+    assert result["envelope"]["plan"]["scenario"] == "robotclaw"
+    assert result["envelope"]["routing"]["selected_strategy"] == "delegated_robotclaw"
+    assert result["envelope"]["authority"]["approvals_required"] is True
+    assert "audit" in result["envelope"]["authority"]["required_capabilities"]
+    assert result["envelope"]["execution"]["execution_status"] == "blocked"
+    assert result["envelope"]["execution"]["gate_status"] == "denied"
+    assert result["result"] == {}
+    assert result["outcome"]["success"] is False
+    assert result["audit_event_count"] == 1
+    assert len(audit_store.events) == 1
 
 
 def test_orchestrator_wires_stakeholder_context_into_procurement_graph():
@@ -295,10 +299,11 @@ def test_orchestrator_wires_stakeholder_context_into_procurement_graph():
         if item["operator_id"] == "stakeholder"
     )
 
-    assert "stakeholder_context" in result["plan"]
-    assert result["plan"]["stakeholder_context"]["conflicts"]
-    assert result["plan"]["stakeholder_context"]["negotiation_proposals"]
-    assert stakeholder_trace["warnings"] == result["plan"]["stakeholder_context"]["warnings"]
+    assert "stakeholder_context" in result["envelope"]["plan"]
+    assert result["envelope"]["plan"]["stakeholder_context"]["conflicts"]
+    assert result["envelope"]["plan"]["stakeholder_context"]["negotiation_proposals"]
+    assert result["envelope"]["execution"]["gate_status"] == "degraded"
+    assert stakeholder_trace["warnings"] == result["envelope"]["plan"]["stakeholder_context"]["warnings"]
 
 
 def test_orchestrator_passes_plan_decision_weights_into_procurement_ranking():
@@ -351,8 +356,46 @@ def test_orchestrator_passes_plan_decision_weights_into_procurement_ranking():
         session_id="session-procurement-weighted",
     )
 
-    assert result["plan"]["decision_weights"]["quality"] > result["plan"]["decision_weights"]["cost"]
+    assert result["envelope"]["plan"]["decision_weights"]["quality"] > result["envelope"]["plan"]["decision_weights"]["cost"]
+    assert result["envelope"]["execution"]["gate_status"] == "degraded"
     assert result["result"]["recommended"]["id"] == "premium-choice"
+
+
+def test_orchestrator_uses_scenario_profile_as_effective_risk_truth_source() -> None:
+    """effective risk 应由 scenario profile 修正，而不是直接复用 routing 原始风险。"""
+
+    class InMemoryAuditStore:
+        """为 effective risk 断言提供最小审计仓储。"""
+
+        def append_event(
+            self,
+            session_id: str,
+            step_name: str,
+            operator_id: str,
+            payload: dict[str, object] | None = None,
+        ) -> None:
+            del session_id, step_name, operator_id, payload
+
+    orchestrator = VelarisBizOrchestrator(audit_store=InMemoryAuditStore())
+    plan = build_capability_plan(
+        query="比较两家供应商，预算不超过 200000，必须通过合规审计。",
+        scenario="procurement",
+    )
+    routing = orchestrator.router.route(plan=plan, query=plan["query"])
+    authority = orchestrator.authority_service.issue_plan(
+        required_capabilities=routing.required_capabilities,
+        governance=plan["governance"],
+    )
+
+    gate_decision = orchestrator._build_gate_decision(
+        plan=plan,
+        routing=routing.to_dict(),
+        authority=authority.to_dict(),
+    )
+
+    assert routing.trace["routing_context"]["risk"]["level"] == "high"
+    assert gate_decision.effective_risk_level == "medium"
+    assert gate_decision.gate_status == "degraded"
 
 
 def test_orchestrator_persists_audit_trace(postgres_dsn: str):
@@ -397,7 +440,8 @@ def test_orchestrator_persists_audit_trace(postgres_dsn: str):
 
     events = audit_store.list_by_session(session_id)
 
-    assert result["task"]["status"] == "completed"
+    assert result["envelope"]["tasks"][0]["status"] == "completed"
+    assert result["envelope"]["execution"]["audit_status"] == "persisted"
     assert result["audit_event_count"] == 2
     assert len(events) == 2
     assert {event.step_name for event in events} == {
@@ -443,7 +487,7 @@ def test_orchestrator_ignores_audit_store_failures_on_success():
         session_id="session-audit-fallback",
     )
 
-    assert result["task"]["status"] == "completed"
+    assert result["envelope"]["tasks"][0]["status"] == "completed"
     assert result["outcome"]["success"] is True
     assert result["audit_event_count"] == 0
 
@@ -486,7 +530,8 @@ def test_orchestrator_requires_audit_trail_for_strict_governance():
         )
 
     error_payload = exc_info.value.args[0]
-    assert error_payload["task"]["status"] == "failed"
+    assert error_payload["envelope"]["execution"]["execution_status"] == "blocked"
+    assert error_payload["envelope"]["execution"]["gate_status"] == "denied"
     assert error_payload["outcome"]["success"] is False
     assert "audit trail required" in error_payload["outcome"]["summary"]
     assert error_payload["audit_event_count"] == 0
@@ -528,7 +573,7 @@ def test_orchestrator_preserves_original_business_failure_when_audit_store_break
             )
 
     error_payload = exc_info.value.args[0]
-    assert error_payload["task"]["status"] == "failed"
+    assert error_payload["envelope"]["execution"]["execution_status"] == "failed"
     assert error_payload["outcome"]["success"] is False
     assert error_payload["outcome"]["summary"] == "biz exploded"
     assert error_payload["audit_event_count"] == 0
@@ -583,12 +628,13 @@ def test_orchestrator_appends_operator_trace_summary_into_audit_payload() -> Non
                 }
             ],
         },
-        constraints={"requires_audit": True},
+        constraints={"risk_level": "medium"},
         session_id="session-procurement-phase2",
     )
 
     assert result["audit_event_count"] == 2
     assert result["result"]["operator_trace"][0]["operator_id"] == "intent"
     assert result["result"]["audit_trace"]["audit_event"]["operator_id"] == "explanation"
+    assert result["envelope"]["execution"]["gate_status"] == "degraded"
     completed_payload = audit_store.events[1]["payload"]
     assert completed_payload["operator_trace_summary"][0]["operator_id"] == "intent"

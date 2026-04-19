@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from velaris_agent.decision.context import DecisionExecutionContext
 
 
 @dataclass(frozen=True)
@@ -25,7 +28,7 @@ class DecisionOperator(Protocol):
 
     spec: OperatorSpec
 
-    def run(self, context: "DecisionExecutionContext") -> "DecisionExecutionContext":
+    def run(self, context: DecisionExecutionContext) -> DecisionExecutionContext:
         """执行算子并返回更新后的上下文。"""
 
         raise NotImplementedError
