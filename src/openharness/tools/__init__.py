@@ -34,7 +34,6 @@ from openharness.tools.mcp_tool import McpToolAdapter
 from openharness.tools.notebook_edit_tool import NotebookEditTool
 from openharness.tools.recall_decisions_tool import RecallDecisionsTool
 from openharness.tools.recall_preferences_tool import RecallPreferencesTool
-from openharness.tools.robotclaw_dispatch_tool import RobotClawDispatchTool as RobotClawDispatchTool  # compat alias
 from openharness.tools.read_mcp_resource_tool import ReadMcpResourceTool
 from openharness.tools.remote_trigger_tool import RemoteTriggerTool
 from openharness.tools.save_decision_tool import SaveDecisionTool
@@ -51,11 +50,9 @@ from openharness.tools.task_stop_tool import TaskStopTool
 from openharness.tools.task_update_tool import TaskUpdateTool
 from openharness.tools.team_create_tool import TeamCreateTool
 from openharness.tools.team_delete_tool import TeamDeleteTool
-from openharness.tools.tokencost_analyze_tool import TokenCostAnalyzeTool
 from openharness.tools.todo_write_tool import TodoWriteTool
 from openharness.tools.travel_compare_tool import TravelCompareTool
 from openharness.tools.tool_search_tool import ToolSearchTool
-from openharness.tools.travel_recommend_tool import TravelRecommendTool
 from openharness.tools.web_fetch_tool import WebFetchTool
 from openharness.tools.web_search_tool import WebSearchTool
 
@@ -63,6 +60,22 @@ from openharness.tools.web_search_tool import WebSearchTool
 def create_default_tool_registry(mcp_manager=None) -> ToolRegistry:
     """Return the default built-in tool registry."""
     registry = ToolRegistry()
+    # Commercial tools are optional in the public repo. Keep imports lazy so
+    # `create_default_tool_registry()` works even when those files are absent.
+    try:
+        from openharness.tools.travel_recommend_tool import TravelRecommendTool  # type: ignore
+    except ModuleNotFoundError:
+        TravelRecommendTool = None  # type: ignore[assignment]
+    try:
+        from openharness.tools.tokencost_analyze_tool import TokenCostAnalyzeTool  # type: ignore
+    except ModuleNotFoundError:
+        TokenCostAnalyzeTool = None  # type: ignore[assignment]
+    try:
+        from openharness.tools.robotclaw_dispatch_tool import (  # type: ignore
+            RobotClawDispatchTool as RobotClawDispatchTool,
+        )
+    except ModuleNotFoundError:
+        RobotClawDispatchTool = None  # type: ignore[assignment]
     for tool in (
         BashTool(),
         AskUserQuestionTool(),
@@ -79,10 +92,10 @@ def create_default_tool_registry(mcp_manager=None) -> ToolRegistry:
         KnowledgeIngestTool(),
         KnowledgeQueryTool(),
         KnowledgeLintTool(),
-        TravelRecommendTool(),
+        TravelRecommendTool() if TravelRecommendTool is not None else None,
         TravelCompareTool(),
-        TokenCostAnalyzeTool(),
-        RobotClawDispatchTool(),
+        TokenCostAnalyzeTool() if TokenCostAnalyzeTool is not None else None,
+        RobotClawDispatchTool() if RobotClawDispatchTool is not None else None,
         FileReadTool(),
         FileWriteTool(),
         FileEditTool(),
@@ -119,6 +132,8 @@ def create_default_tool_registry(mcp_manager=None) -> ToolRegistry:
         TeamCreateTool(),
         TeamDeleteTool(),
     ):
+        if tool is None:
+            continue
         registry.register(tool)
     if mcp_manager is not None:
         registry.register(ListMcpResourcesTool(mcp_manager))

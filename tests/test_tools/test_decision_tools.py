@@ -13,21 +13,26 @@ from openharness.tools.decision_score_tool import DecisionScoreInput, DecisionSc
 from openharness.tools.recall_decisions_tool import RecallDecisionsInput, RecallDecisionsTool
 from openharness.tools.recall_preferences_tool import RecallPreferencesInput, RecallPreferencesTool
 from openharness.tools.save_decision_tool import SaveDecisionInput, SaveDecisionTool
-from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.memory.types import DecisionRecord
+from velaris_agent.persistence.factory import build_decision_memory
+from velaris_agent.persistence.schema import bootstrap_sqlite_schema
+from velaris_agent.persistence.sqlite_helpers import get_project_database_path
 
 
 def _ctx(tmp_path: Path) -> ToolExecutionContext:
     """构造带 decision_memory_dir 的执行上下文。"""
+
+    bootstrap_sqlite_schema(get_project_database_path(tmp_path))
     return ToolExecutionContext(
         cwd=tmp_path,
         metadata={"decision_memory_dir": str(tmp_path / "decisions")},
     )
 
 
-def _seed_records(tmp_path: Path, count: int = 3) -> DecisionMemory:
+def _seed_records(tmp_path: Path, count: int = 3):
     """在 tmp_path 下预写入一批决策记录。"""
-    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+
+    mem = build_decision_memory(base_dir=tmp_path / "decisions", cwd=tmp_path)
     for i in range(count):
         rec = DecisionRecord(
             decision_id=f"dec-seed{i:03d}",
@@ -164,7 +169,7 @@ async def test_save_decision_tool_persists(tmp_path: Path):
     assert decision_id.startswith("dec-")
 
     # 验证持久化
-    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    mem = build_decision_memory(base_dir=tmp_path / "decisions", cwd=tmp_path)
     record = mem.get(decision_id)
     assert record is not None
     assert record.user_id == "u-save"

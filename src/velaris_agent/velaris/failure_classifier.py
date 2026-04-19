@@ -8,12 +8,10 @@ from openharness.security.redaction import redact_sensitive_text
 
 
 _INFRASTRUCTURE_MARKERS = (
-    "postgres",
     "database",
     "connection",
     "connect",
     "transaction",
-    "psycopg",
     "pool",
     "timeout",
 )

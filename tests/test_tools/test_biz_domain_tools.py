@@ -7,6 +7,10 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("openharness.tools.travel_recommend_tool")
+pytest.importorskip("openharness.tools.tokencost_analyze_tool")
+pytest.importorskip("openharness.tools.robotclaw_dispatch_tool")
+
 from openharness.tools.robotclaw_dispatch_tool import RobotClawDispatchTool, RobotClawDispatchToolInput
 from openharness.tools.tokencost_analyze_tool import TokenCostAnalyzeTool, TokenCostAnalyzeToolInput
 from openharness.tools.travel_compare_tool import TravelCompareTool

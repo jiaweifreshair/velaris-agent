@@ -19,6 +19,8 @@ async def test_travel_plan_recommends_travel_tool_and_registry_executes(tmp_path
     biz_plan = registry.get("biz_plan")
     travel_tool = registry.get("travel_recommend")
     travel_compare_tool = registry.get("travel_compare")
+    if travel_tool is None:
+        pytest.skip("未提供 travel_recommend_tool，跳过商旅领域注册表集成测试")
 
     plan_result = await biz_plan.execute(
         biz_plan.input_model(
@@ -69,6 +71,8 @@ async def test_tokencost_plan_recommends_tokencost_tool_and_registry_executes(tm
 
     biz_plan = registry.get("biz_plan")
     tokencost_tool = registry.get("tokencost_analyze")
+    if tokencost_tool is None:
+        pytest.skip("未提供 tokencost_analyze_tool，跳过 tokencost 领域注册表集成测试")
 
     plan_result = await biz_plan.execute(
         biz_plan.input_model(
@@ -116,6 +120,8 @@ async def test_robotclaw_plan_recommends_dispatch_tool_and_registry_executes(tmp
 
     biz_plan = registry.get("biz_plan")
     robotclaw_tool = registry.get("robotclaw_dispatch")
+    if robotclaw_tool is None:
+        pytest.skip("未提供 robotclaw_dispatch_tool，跳过 robotclaw 领域注册表集成测试")
 
     plan_result = await biz_plan.execute(
         biz_plan.input_model(

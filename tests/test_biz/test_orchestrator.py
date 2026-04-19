@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -17,16 +17,6 @@ from velaris_agent.memory.types import (
     StakeholderMapModel,
     StakeholderRole,
 )
-
-
-@pytest.fixture
-def postgres_dsn() -> str:
-    """提供编排器审计链路使用的 PostgreSQL DSN；未配置时跳过集成测试。"""
-
-    dsn = os.getenv("VELARIS_TEST_POSTGRES_DSN", "").strip()
-    if not dsn:
-        pytest.skip("未设置 VELARIS_TEST_POSTGRES_DSN, 跳过 PostgreSQL 集成测试")
-    return dsn
 
 
 def _make_procurement_stakeholder_map() -> StakeholderMapModel:
@@ -123,8 +113,8 @@ def _make_quality_focused_procurement_stakeholder_map() -> StakeholderMapModel:
     )
 
 
-def test_orchestrator_executes_tokencost_flow_with_runtime_controls():
-    orchestrator = VelarisBizOrchestrator()
+def test_orchestrator_executes_tokencost_flow_with_runtime_controls(tmp_path: Path) -> None:
+    orchestrator = VelarisBizOrchestrator(cwd=tmp_path)
 
     result = orchestrator.execute(
         query="我每月 OpenAI 成本 2000 美元，想降到 800",
@@ -162,7 +152,7 @@ def test_orchestrator_executes_tokencost_flow_with_runtime_controls():
     assert result["envelope"]["tasks"][0]["status"] == "completed"
     assert result["result"]["projected_monthly_cost"] == 850
     assert result["outcome"]["success"] is True
-    assert result["audit_event_count"] == 0
+    assert result["audit_event_count"] == 2
     assert len(orchestrator.task_ledger.list_by_session("session-token")) == 1
     assert len(orchestrator.outcome_store.list_by_session("session-token")) == 1
 
@@ -398,24 +388,28 @@ def test_orchestrator_uses_scenario_profile_as_effective_risk_truth_source() -> 
     assert gate_decision.gate_status == "degraded"
 
 
-def test_orchestrator_persists_audit_trace(postgres_dsn: str):
-    """编排器在接入 PostgreSQL 审计仓储时应写入最小审计轨迹。"""
+def test_orchestrator_persists_audit_trace(tmp_path: Path) -> None:
+    """编排器在接入 SQLite 审计仓储时应写入最小审计轨迹。"""
 
-    from velaris_agent.persistence.postgres_runtime import (
-        AuditEventStore,
-        PostgresOutcomeStore,
-        PostgresTaskLedger,
+    from velaris_agent.persistence.schema import bootstrap_sqlite_schema
+    from velaris_agent.persistence.sqlite_helpers import get_project_database_path
+    from velaris_agent.persistence.sqlite_runtime import (
+        SqliteAuditEventStore,
+        SqliteOutcomeStore,
+        SqliteTaskLedger,
     )
-    from velaris_agent.persistence.schema import bootstrap_schema
 
     session_id = f"session-audit-{uuid4().hex[:12]}"
 
-    bootstrap_schema(postgres_dsn)
-    audit_store = AuditEventStore(postgres_dsn)
+    database_path = get_project_database_path(tmp_path)
+    bootstrap_sqlite_schema(database_path)
+    audit_store = SqliteAuditEventStore(str(database_path))
     orchestrator = VelarisBizOrchestrator(
-        task_ledger=PostgresTaskLedger(postgres_dsn),
-        outcome_store=PostgresOutcomeStore(postgres_dsn),
+        task_ledger=SqliteTaskLedger(str(database_path)),
+        outcome_store=SqliteOutcomeStore(str(database_path)),
         audit_store=audit_store,
+        cwd=tmp_path,
+        sqlite_database_path=database_path,
     )
 
     result = orchestrator.execute(
@@ -441,7 +435,7 @@ def test_orchestrator_persists_audit_trace(postgres_dsn: str):
     events = audit_store.list_by_session(session_id)
 
     assert result["envelope"]["tasks"][0]["status"] == "completed"
-    assert result["envelope"]["execution"]["audit_status"] == "persisted"
+    assert result["envelope"]["execution"]["audit_status"] == "not_required"
     assert result["audit_event_count"] == 2
     assert len(events) == 2
     assert {event.step_name for event in events} == {

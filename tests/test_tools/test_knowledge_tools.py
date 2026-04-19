@@ -19,10 +19,16 @@ from openharness.tools.self_evolution_review_tool import (
 )
 from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.memory.types import DecisionRecord
+from velaris_agent.persistence.schema import bootstrap_sqlite_schema
+from velaris_agent.persistence.sqlite_helpers import get_project_database_path
 
 
 def _ctx(tmp_path: Path) -> ToolExecutionContext:
     """构造同时包含决策记忆与知识库路径的执行上下文。"""
+
+    # 统一显式 bootstrap 一次，避免不同测试因“是否先跑过 storage init”而产生隐式依赖。
+    bootstrap_sqlite_schema(get_project_database_path(tmp_path))
+
     return ToolExecutionContext(
         cwd=tmp_path,
         metadata={
@@ -37,6 +43,7 @@ def _ctx(tmp_path: Path) -> ToolExecutionContext:
 @pytest.mark.asyncio
 async def test_knowledge_ingest_query_lint_tools(tmp_path: Path) -> None:
     """知识库工具应支持 ingest/query/lint 三步闭环。"""
+
     context = _ctx(tmp_path)
 
     ingest_result = await KnowledgeIngestTool().execute(
@@ -72,7 +79,10 @@ async def test_knowledge_ingest_query_lint_tools(tmp_path: Path) -> None:
 
 def _seed_decisions_for_evolution(tmp_path: Path) -> None:
     """写入两条历史样本，为自进化测试准备数据。"""
-    memory = DecisionMemory(base_dir=tmp_path / "decisions")
+
+    from velaris_agent.persistence.factory import build_decision_memory
+
+    memory = build_decision_memory(base_dir=tmp_path / "decisions", cwd=tmp_path)
     now = datetime.now(timezone.utc)
     memory.save(
         DecisionRecord(
@@ -113,6 +123,7 @@ def _seed_decisions_for_evolution(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_self_evolution_review_tool_and_save_trigger(tmp_path: Path) -> None:
     """自进化工具和 save_decision 自动触发应返回结构化结果。"""
+
     context = _ctx(tmp_path)
     _seed_decisions_for_evolution(tmp_path)
 
@@ -146,6 +157,7 @@ async def test_self_evolution_review_tool_and_save_trigger(tmp_path: Path) -> No
     assert save_result.is_error is False
     first = json.loads(save_result.output)
     assert first["self_evolution"]["triggered"] is False
+    assert first["self_evolution"]["queued"] is False
 
     save_result_2 = await SaveDecisionTool().execute(
         SaveDecisionInput(
@@ -161,27 +173,20 @@ async def test_self_evolution_review_tool_and_save_trigger(tmp_path: Path) -> No
         context,
     )
     second = json.loads(save_result_2.output)
-    assert second["self_evolution"]["triggered"] is True
-    assert second["self_evolution"]["queued"] is False
+    assert second["self_evolution"]["triggered"] is False
+    assert second["self_evolution"]["queued"] is True
+    assert second["self_evolution"]["job_id"]
 
 
 @pytest.mark.asyncio
-async def test_save_decision_queues_self_evolution_when_postgres_enabled(
+async def test_save_decision_queues_self_evolution_when_queue_available(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """启用 PostgreSQL 且命中 review interval 时，应入队而不是同步执行自进化。"""
+    """当 job queue 可用且命中 review interval 时，应入队而不是同步执行自进化。"""
 
-    context = ToolExecutionContext(
-        cwd=tmp_path,
-        metadata={
-            "decision_memory_dir": str(tmp_path / "decisions"),
-            "knowledge_base_dir": str(tmp_path / "knowledge"),
-            "evolution_report_dir": str(tmp_path / "evolution-reports"),
-            "evolution_review_interval": 2,
-            "postgres_dsn": "postgresql://user:pass@localhost:5432/velaris",
-        },
-    )
+    context = _ctx(tmp_path)
+
     memory = DecisionMemory(base_dir=tmp_path / "decisions")
     queued_calls: list[dict[str, object]] = []
 
@@ -194,8 +199,6 @@ async def test_save_decision_queues_self_evolution_when_postgres_enabled(
             idempotency_key: str,
             payload: dict[str, object],
         ) -> str:
-            """记录一次 enqueue 调用，并返回稳定的 job_id。"""
-
             queued_calls.append(
                 {
                     "job_type": job_type,
@@ -205,17 +208,26 @@ async def test_save_decision_queues_self_evolution_when_postgres_enabled(
             )
             return "job-self-evo-001"
 
-    def fake_build_decision_memory(postgres_dsn: str = "", base_dir: str | Path | None = None):
-        """复用文件后端，避免测试依赖真实 PostgreSQL。"""
+    def fake_build_decision_memory(
+        base_dir: str | Path | None = None,
+        sqlite_database_path: str | Path | None = None,
+        cwd: str | Path | None = None,
+    ):
+        """复用文件后端，避免测试耦合 SQLite 内部实现。"""
 
-        assert postgres_dsn == "postgresql://user:pass@localhost:5432/velaris"
         assert base_dir == str(tmp_path / "decisions")
+        assert sqlite_database_path is None
+        assert cwd == tmp_path
         return memory
 
-    def fake_build_job_queue(postgres_dsn: str = "") -> _FakeQueue | None:
-        """在传入 PostgreSQL DSN 时返回伪队列。"""
+    def fake_build_job_queue(
+        sqlite_database_path: str | Path | None = None,
+        cwd: str | Path | None = None,
+    ) -> _FakeQueue | None:
+        """在传入 cwd 时返回伪队列。"""
 
-        assert postgres_dsn == "postgresql://user:pass@localhost:5432/velaris"
+        assert sqlite_database_path is None
+        assert cwd == tmp_path
         return _FakeQueue()
 
     def fail_review(*args, **kwargs):
@@ -277,3 +289,4 @@ async def test_save_decision_queues_self_evolution_when_postgres_enabled(
     assert second["self_evolution"]["queued"] is True
     assert second["self_evolution"]["job_id"] == "job-self-evo-001"
     assert queued_calls and queued_calls[0]["job_type"] == "self_evolution_review"
+

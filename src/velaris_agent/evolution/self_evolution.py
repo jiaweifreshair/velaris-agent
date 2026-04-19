@@ -55,7 +55,7 @@ def build_self_evolution_review_job_payload(
 
 def run_self_evolution_review_job(
     *,
-    postgres_dsn: str,
+    sqlite_database_path: str,
     payload: dict[str, Any],
 ) -> SelfEvolutionReport:
     """执行一条 self_evolution_review 队列任务。
@@ -67,7 +67,7 @@ def run_self_evolution_review_job(
     from velaris_agent.persistence.factory import build_decision_memory
 
     memory = build_decision_memory(
-        postgres_dsn=postgres_dsn,
+        sqlite_database_path=sqlite_database_path,
         base_dir=payload.get("decision_memory_dir"),
     )
     engine = SelfEvolutionEngine(

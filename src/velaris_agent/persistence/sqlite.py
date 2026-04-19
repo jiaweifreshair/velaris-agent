@@ -33,7 +33,7 @@ def _apply_pragmas(connection: sqlite3.Connection) -> None:
 def sqlite_connection(database_path: str | Path) -> Iterator[sqlite3.Connection]:
     """创建 SQLite 连接并在上下文退出时统一提交或回滚。
 
-    该上下文与 `postgres_connection` 保持一致的行为契约：
+    该上下文保持稳定一致的事务行为契约：
     - 正常退出：commit
     - 异常退出：rollback 并向上抛出
     - 始终 close 连接

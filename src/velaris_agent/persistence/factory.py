@@ -1,4 +1,10 @@
-"""决策记忆工厂。"""
+"""Velaris 持久化对象工厂。
+
+本仓库已收束为 SQLite 单库主线，因此该模块只负责：
+- 解析 `sqlite_database_path` / `cwd` 推导出的项目内数据库位置；
+- 幂等初始化 schema（避免调用方必须先手动执行 `velaris storage init` 才能使用）；
+- 构建 SQLite 仓储实现，并在缺省场景下回退到内存/文件后端以保持兼容。
+"""
 
 from __future__ import annotations
 
@@ -10,21 +16,14 @@ from velaris_agent.velaris.outcome_store import OutcomeStore
 from velaris_agent.velaris.task_ledger import TaskLedger
 
 if TYPE_CHECKING:
-    from velaris_agent.persistence.postgres_execution import (
-        ExecutionRepository,
-        SessionRepository,
-    )
-    from velaris_agent.persistence.job_queue import PostgresJobQueue, SqliteJobQueue
-    from velaris_agent.persistence.postgres_runtime import (
-        AuditEventStore,
-    )
+    from velaris_agent.persistence.job_queue import SqliteJobQueue
     from velaris_agent.persistence.sqlite_execution import (
         ExecutionRepository as SqliteExecutionRepository,
         SessionRepository as SqliteSessionRepository,
     )
-    from velaris_agent.persistence.sqlite_runtime import (
-        SqliteAuditEventStore,
-    )
+    from velaris_agent.persistence.sqlite_runtime import SqliteAuditEventStore
+
+_BOOTSTRAPPED_SQLITE_PATHS: set[str] = set()
 
 
 def _resolve_sqlite_database_path(
@@ -47,168 +46,129 @@ def _resolve_sqlite_database_path(
     return None
 
 
+def _ensure_sqlite_schema(database_path: str) -> None:
+    """确保 SQLite schema 已初始化。
+
+    该函数是幂等的：同一路径只会执行一次 bootstrap，避免在高频工厂调用中重复跑 DDL。
+    """
+
+    if database_path in _BOOTSTRAPPED_SQLITE_PATHS:
+        return
+    from velaris_agent.persistence.schema import bootstrap_sqlite_schema
+
+    bootstrap_sqlite_schema(database_path)
+    _BOOTSTRAPPED_SQLITE_PATHS.add(database_path)
+
+
 def build_decision_memory(
-    postgres_dsn: str = "",
     base_dir: str | Path | None = None,
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
 ) -> DecisionMemory:
     """按配置构建决策记忆后端。
 
-    SQLite 会成为主线，因此优先按 sqlite_database_path/cwd 构建 SQLite 后端；
-    若未提供 SQLite 路径但显式给出 `postgres_dsn`，则继续沿用 PostgreSQL；
-    其余情况保持文件后端，确保现有行为默认兼容。
+    - 若解析到 SQLite 路径：返回 `SqliteDecisionMemory`；
+    - 否则：回退到文件版 `DecisionMemory`（用于无项目上下文的纯函数调用/单测）。
     """
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.sqlite_memory import SqliteDecisionMemory
 
         return SqliteDecisionMemory(resolved_sqlite_path, base_dir=base_dir)
 
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.postgres_memory import PostgresDecisionMemory
-
-        return PostgresDecisionMemory(postgres_dsn.strip(), base_dir=base_dir)
     return DecisionMemory(base_dir=base_dir)
 
 
 def build_task_ledger(
-    postgres_dsn: str = "",
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
 ) -> TaskLedger:
-    """按配置构建任务账本后端。
-
-    该工厂保持默认内存账本不变，只在显式提供 SQLite/PostgreSQL 配置时切换到数据库后端。
-    """
+    """按配置构建任务账本后端。"""
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.sqlite_runtime import SqliteTaskLedger
 
         return SqliteTaskLedger(resolved_sqlite_path)
 
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.postgres_runtime import PostgresTaskLedger
-
-        return PostgresTaskLedger(postgres_dsn.strip())
     return TaskLedger()
 
 
 def build_outcome_store(
-    postgres_dsn: str = "",
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
 ) -> OutcomeStore:
-    """按配置构建 outcome 仓储后端。
-
-    这样 OpenHarness 入口后续只需透传 DSN，就能在不改调用点的前提下接入持久化。
-    """
+    """按配置构建 outcome 仓储后端。"""
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.sqlite_runtime import SqliteOutcomeStore
 
         return SqliteOutcomeStore(resolved_sqlite_path)
 
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.postgres_runtime import PostgresOutcomeStore
-
-        return PostgresOutcomeStore(postgres_dsn.strip())
     return OutcomeStore()
 
 
 def build_audit_store(
-    postgres_dsn: str = "",
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
-) -> "AuditEventStore | SqliteAuditEventStore | None":
-    """按配置构建审计事件仓储。
-
-    审计仓储保持可选，确保旧调用方在未开启 PostgreSQL 时仍返回 `audit_event_count = 0`。
-    """
+) -> "SqliteAuditEventStore | None":
+    """按配置构建审计事件仓储。"""
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.sqlite_runtime import SqliteAuditEventStore
 
         return SqliteAuditEventStore(resolved_sqlite_path)
-
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.postgres_runtime import AuditEventStore
-
-        return AuditEventStore(postgres_dsn.strip())
     return None
 
 
 def build_execution_repository(
-    postgres_dsn: str = "",
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
-) -> "ExecutionRepository | SqliteExecutionRepository | None":
-    """按配置构建 execution 主记录仓储。
-
-    只有显式提供 PostgreSQL DSN 时才暴露 execution 主线仓储，
-    这样现有未迁移调用方不会被强制拉入新的持久化依赖。
-    """
+) -> "SqliteExecutionRepository | None":
+    """按配置构建 execution 主记录仓储。"""
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.sqlite_execution import ExecutionRepository
 
         return ExecutionRepository(resolved_sqlite_path)
-
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.postgres_execution import ExecutionRepository
-
-        return ExecutionRepository(postgres_dsn.strip())
     return None
 
 
 def build_session_repository(
-    postgres_dsn: str = "",
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
-) -> "SessionRepository | SqliteSessionRepository | None":
-    """按配置构建 session 主记录仓储。
-
-    该入口为后续 `session_storage.py` PostgreSQL 化预留统一工厂，
-    避免桥接层直接 new 数据库仓储实现。
-    """
+) -> "SqliteSessionRepository | None":
+    """按配置构建 session 主记录仓储。"""
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.sqlite_execution import SessionRepository
 
         return SessionRepository(resolved_sqlite_path)
-
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.postgres_execution import SessionRepository
-
-        return SessionRepository(postgres_dsn.strip())
     return None
 
 
 def build_job_queue(
-    postgres_dsn: str = "",
     sqlite_database_path: str | Path | None = None,
     cwd: str | Path | None = None,
-) -> "PostgresJobQueue | SqliteJobQueue | None":
-    """按配置构建数据库任务队列。
-
-    只有显式提供 PostgreSQL DSN 时才启用队列，
-    这样 `save_decision` 在默认文件模式下仍保持原有同步兼容行为。
-    """
+) -> "SqliteJobQueue | None":
+    """按配置构建数据库任务队列。"""
 
     resolved_sqlite_path = _resolve_sqlite_database_path(sqlite_database_path, cwd)
     if resolved_sqlite_path is not None:
+        _ensure_sqlite_schema(resolved_sqlite_path)
         from velaris_agent.persistence.job_queue import SqliteJobQueue
 
         return SqliteJobQueue(resolved_sqlite_path)
-
-    if postgres_dsn.strip():
-        from velaris_agent.persistence.job_queue import PostgresJobQueue
-
-        return PostgresJobQueue(postgres_dsn.strip())
     return None
+
