@@ -155,6 +155,10 @@ def test_orchestrator_executes_tokencost_flow_with_runtime_controls(tmp_path: Pa
     assert result["audit_event_count"] == 2
     assert len(orchestrator.task_ledger.list_by_session("session-token")) == 1
     assert len(orchestrator.outcome_store.list_by_session("session-token")) == 1
+    execution_id = result["envelope"]["execution"]["execution_id"]
+    stored_execution = orchestrator.execution_repository.get(execution_id)
+    assert stored_execution is not None
+    assert stored_execution.resume_cursor == {"stage": "completed"}
 
 
 def test_orchestrator_persists_session_snapshot_with_correct_cwd_for_resume(tmp_path: Path) -> None:

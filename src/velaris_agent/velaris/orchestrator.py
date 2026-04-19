@@ -180,6 +180,7 @@ class VelarisBizOrchestrator:
                         execution,
                         execution_status="blocked",
                         audit_status="failed",
+                        resume_cursor={"stage": "blocked"},
                     ),
                     plan=plan,
                     routing=routing.to_dict(),
@@ -207,6 +208,7 @@ class VelarisBizOrchestrator:
                     execution,
                     execution_status="blocked",
                     audit_status="persisted" if audit_event_count else "not_required",
+                    resume_cursor={"stage": "blocked"},
                 ),
                 plan=plan,
                 routing=routing.to_dict(),
@@ -249,6 +251,7 @@ class VelarisBizOrchestrator:
                         execution,
                         execution_status="blocked",
                         audit_status="failed",
+                        resume_cursor={"stage": "blocked"},
                     ),
                     plan=plan,
                     routing=routing.to_dict(),
@@ -346,6 +349,7 @@ class VelarisBizOrchestrator:
                     gate_decision=gate_decision,
                     audit_event_count=audit_event_count,
                 ),
+                resume_cursor={"stage": "failed"},
             )
             if self.execution_repository is not None:
                 self.execution_repository.update_status(
@@ -403,9 +407,10 @@ class VelarisBizOrchestrator:
                 "contract_ready": scenario_result.get("contract_ready"),
             },
         )
+        final_execution_status = self._final_execution_status(gate_decision=gate_decision)
         completed_execution = self._replace_execution(
             execution,
-            execution_status=self._final_execution_status(gate_decision=gate_decision),
+            execution_status=final_execution_status,
             structural_complete=True,
             constraint_complete=gate_decision.gate_status == "allowed",
             goal_complete=gate_decision.gate_status == "allowed",
@@ -413,6 +418,7 @@ class VelarisBizOrchestrator:
                 gate_decision=gate_decision,
                 audit_event_count=audit_event_count,
             ),
+            resume_cursor={"stage": final_execution_status},
         )
         if self.execution_repository is not None:
             self.execution_repository.update_status(
@@ -591,6 +597,7 @@ class VelarisBizOrchestrator:
         structural_complete: bool | None = None,
         constraint_complete: bool | None = None,
         goal_complete: bool | None = None,
+        resume_cursor: dict[str, Any] | None = None,
     ) -> BizExecutionRecord:
         """返回更新后的 execution 快照，避免原对象被原地修改。"""
 
@@ -608,7 +615,7 @@ class VelarisBizOrchestrator:
             goal_complete=execution.goal_complete if goal_complete is None else goal_complete,
             created_at=execution.created_at,
             updated_at=datetime.now(UTC).isoformat(),
-            resume_cursor=execution.resume_cursor,
+            resume_cursor=dict(execution.resume_cursor or {}) if resume_cursor is None else dict(resume_cursor),
         )
 
     def _final_execution_status(self, gate_decision: GovernanceGateDecision) -> str:
