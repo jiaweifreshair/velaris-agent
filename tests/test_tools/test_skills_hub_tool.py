@@ -12,6 +12,7 @@ import pytest
 
 from openharness.tools.base import ToolExecutionContext
 from openharness.tools.skills_hub_tool import SkillsHubInput, SkillsHubTool
+from openharness.skills.skillhub_source import SkillHubSource
 
 
 def _context(tmp_path: Path) -> ToolExecutionContext:
@@ -189,3 +190,19 @@ class TestExecuteUpdateWithoutName:
         )
         assert result.is_error is True
         assert "name" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# default_sources
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultSources:
+    def test_includes_skillhub_before_optional_local_source(self) -> None:
+        from openharness.tools.skills_hub_tool import default_sources
+
+        sources = default_sources()
+        assert sources
+        assert isinstance(sources[0], SkillHubSource)
+        assert sources[0].source_id() == "skillhub"
+        assert any(src.source_id() == "optional" for src in sources)
