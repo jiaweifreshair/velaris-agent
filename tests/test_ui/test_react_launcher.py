@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from openharness.ui.app import run_repl
 from openharness.ui.react_launcher import build_backend_command
+from openharness.ui.react_launcher import launch_react_tui
 
 
 def test_build_backend_command_includes_flags():
@@ -23,6 +26,81 @@ def test_build_backend_command_includes_flags():
     assert "--base-url" in command
     assert "--system-prompt" in command
     assert "--api-key" not in command
+
+
+@pytest.mark.asyncio
+async def test_launch_react_tui_forwards_runtime_overrides(tmp_path, monkeypatch):
+    """React 启动器应把 provider 相关覆盖项传给后端命令。"""
+
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir()
+    (frontend_dir / "package.json").write_text("{}", encoding="utf-8")
+    (frontend_dir / "node_modules").mkdir()
+
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        async def wait(self) -> int:
+            return 0
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr("openharness.ui.react_launcher.get_frontend_dir", lambda: frontend_dir)
+    monkeypatch.setattr("openharness.ui.react_launcher.asyncio.create_subprocess_exec", fake_create_subprocess_exec)
+
+    await launch_react_tui(
+        prompt="hi",
+        cwd="/tmp/demo",
+        model="gpt-5.4",
+        provider="openai",
+        api_format="openai_compat",
+        base_url="https://api.openai.com/v1",
+        system_prompt="system",
+        auto_compact_threshold_tokens=2048,
+    )
+
+    frontend_config = json.loads(captured["kwargs"]["env"]["VELARIS_FRONTEND_CONFIG"])  # type: ignore[index]
+    backend_command = frontend_config["backend_command"]
+    assert backend_command[:3] == [backend_command[0], "-m", "velaris_agent"]
+    assert "--provider" in backend_command
+    assert "openai" in backend_command
+    assert "--api-format" in backend_command
+    assert "openai_compat" in backend_command
+    assert "--auto-compact-threshold-tokens" in backend_command
+    assert "2048" in backend_command
+    assert frontend_config["initial_prompt"] == "hi"
+
+
+@pytest.mark.asyncio
+async def test_launch_react_tui_reinstalls_when_esbuild_arch_mismatch(tmp_path, monkeypatch):
+    """React 启动器在 esbuild 原生包架构不匹配时应重新安装前端依赖。"""
+
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir()
+    (frontend_dir / "package.json").write_text("{}", encoding="utf-8")
+    (frontend_dir / "node_modules" / "@esbuild" / "darwin-x64").mkdir(parents=True)
+
+    calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
+
+    class FakeProcess:
+        async def wait(self) -> int:
+            return 0
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        calls.append((tuple(str(arg) for arg in args), kwargs))
+        return FakeProcess()
+
+    monkeypatch.setattr("openharness.ui.react_launcher.get_frontend_dir", lambda: frontend_dir)
+    monkeypatch.setattr("openharness.ui.react_launcher.platform.machine", lambda: "arm64")
+    monkeypatch.setattr("openharness.ui.react_launcher.asyncio.create_subprocess_exec", fake_create_subprocess_exec)
+
+    await launch_react_tui(prompt="hi")
+
+    assert calls[0][0][1] == "install"
+    assert calls[1][0][1] == "exec"
 
 
 @pytest.mark.asyncio

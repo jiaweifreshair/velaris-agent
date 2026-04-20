@@ -31,9 +31,12 @@ class BackendHostConfig:
     """Configuration for one backend host session."""
 
     model: str | None = None
+    provider: str | None = None
+    api_format: str | None = None
     base_url: str | None = None
     system_prompt: str | None = None
     api_key: str | None = None
+    auto_compact_threshold_tokens: int | None = None
     api_client: SupportsStreamingMessages | None = None
 
 
@@ -53,9 +56,12 @@ class ReactBackendHost:
     async def run(self) -> int:
         self._bundle = await build_runtime(
             model=self._config.model,
+            provider=self._config.provider,
+            api_format=self._config.api_format,
             base_url=self._config.base_url,
             system_prompt=self._config.system_prompt,
             api_key=self._config.api_key,
+            auto_compact_threshold_tokens=self._config.auto_compact_threshold_tokens,
             api_client=self._config.api_client,
             permission_prompt=self._ask_permission,
             ask_user_prompt=self._ask_question,
@@ -280,9 +286,12 @@ class ReactBackendHost:
 async def run_backend_host(
     *,
     model: str | None = None,
+    provider: str | None = None,
+    api_format: str | None = None,
     base_url: str | None = None,
     system_prompt: str | None = None,
     api_key: str | None = None,
+    auto_compact_threshold_tokens: int | None = None,
     cwd: str | None = None,
     api_client: SupportsStreamingMessages | None = None,
 ) -> int:
@@ -292,9 +301,12 @@ async def run_backend_host(
     host = ReactBackendHost(
         BackendHostConfig(
             model=model,
+            provider=provider,
+            api_format=api_format,
             base_url=base_url,
             system_prompt=system_prompt,
             api_key=api_key,
+            auto_compact_threshold_tokens=auto_compact_threshold_tokens,
             api_client=api_client,
         )
     )

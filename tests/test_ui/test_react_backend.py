@@ -8,7 +8,7 @@ from openharness.api.client import ApiMessageCompleteEvent
 from openharness.api.usage import UsageSnapshot
 from openharness.engine.messages import ConversationMessage, TextBlock
 from openharness.mcp.types import McpConnectionStatus, McpResourceInfo, McpToolInfo
-from openharness.ui.backend_host import BackendHostConfig, ReactBackendHost
+from openharness.ui.backend_host import BackendHostConfig, ReactBackendHost, run_backend_host
 from openharness.ui.runtime import build_runtime, close_runtime, start_runtime
 
 
@@ -38,6 +38,45 @@ class StaticMcpManager:
 
     async def close(self) -> None:
         return None
+
+
+@pytest.mark.asyncio
+async def test_run_backend_host_propagates_runtime_overrides(tmp_path, monkeypatch):
+    """后端 host 包装器应把 provider 相关覆盖项传给运行时配置。"""
+
+    captured: dict[str, BackendHostConfig] = {}
+    monkeypatch.chdir(tmp_path)
+
+    class FakeHost:
+        def __init__(self, config: BackendHostConfig) -> None:
+            captured["config"] = config
+
+        async def run(self) -> int:
+            return 0
+
+    monkeypatch.setattr("openharness.ui.backend_host.ReactBackendHost", FakeHost)
+
+    result = await run_backend_host(
+        cwd=str(tmp_path),
+        model="gpt-5.4",
+        provider="openai",
+        api_format="openai_compat",
+        base_url="https://api.openai.com/v1",
+        system_prompt="system",
+        api_key="secret",
+        auto_compact_threshold_tokens=2048,
+        api_client=StaticApiClient("unused"),
+    )
+
+    assert result == 0
+    config = captured["config"]
+    assert config.model == "gpt-5.4"
+    assert config.provider == "openai"
+    assert config.api_format == "openai_compat"
+    assert config.base_url == "https://api.openai.com/v1"
+    assert config.system_prompt == "system"
+    assert config.api_key == "secret"
+    assert config.auto_compact_threshold_tokens == 2048
 
 
 @pytest.mark.asyncio

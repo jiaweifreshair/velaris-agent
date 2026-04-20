@@ -322,6 +322,11 @@ uv run velaris auth login moonshot --api-key sk-your-key
 # 配置鉴权：仅使用环境变量，不落盘
 uv run velaris auth login moonshot --use-env
 
+# OpenAI 授权模式：可以直接写入 settings.json，或只依赖环境变量
+uv run velaris setup openai --model gpt-5.4 --use-env
+uv run velaris auth login openai --api-key sk-your-key
+uv run velaris auth login openai --use-env
+
 # 如果你已经执行过 `codex login`，OpenAI provider 也可以直接复用
 # `~/.codex/auth.json` 中的 OPENAI_API_KEY（只读回退，不写入 Velaris 配置）
 uv run velaris auth switch openai
@@ -341,7 +346,9 @@ uv run velaris auth logout
 /provider use moonshot
 /auth status
 /auth switch anthropic
+/auth switch openai
 /login moonshot sk-your-key
+/login openai sk-your-key
 /logout
 ```
 
