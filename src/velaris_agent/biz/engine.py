@@ -14,6 +14,11 @@ from typing import Any
 from uuid import uuid4
 
 from velaris_agent.decision.graph import execute_decision_graph
+from velaris_agent.decision.shared_decision import (
+    BundleDecisionResponse,
+    build_bundle_decision_request,
+    evaluate_bundle_decision,
+)
 from velaris_agent.memory.conflict_engine import ConflictDetectionEngine
 from velaris_agent.memory.negotiation import NegotiationStrategy
 from velaris_agent.memory.types import (
@@ -48,6 +53,7 @@ _SCENARIO_KEYWORDS: dict[str, tuple[str, ...]] = {
         "人生", "决策", "选择", "纠结", "该不该", "怎么选",
     ),
     "travel": ("travel", "flight", "hotel", "trip", "商旅", "出差", "机票", "酒店"),
+    "hotel_biztravel": ("hotel_biztravel", "商旅礼宾", "酒店礼宾", "联合决策", "bundle"),
     "tokencost": ("tokencost", "token", "openai", "anthropic", "模型成本", "降本", "api 花费", "成本优化"),
     "robotclaw": ("robotclaw", "dispatch", "robotaxi", "vehicle", "proposal", "派单", "运力", "合约", "车端"),
     "procurement": (
@@ -59,6 +65,15 @@ _SCENARIO_KEYWORDS: dict[str, tuple[str, ...]] = {
 _SCENARIO_CAPABILITIES: dict[str, list[str]] = {
     "lifegoal": ["intent_parse", "option_discovery", "multi_dim_score", "recommendation", "memory_recall"],
     "travel": ["intent_parse", "inventory_search", "option_score", "itinerary_recommend"],
+    "hotel_biztravel": [
+        "intent_parse",
+        "candidate_normalize",
+        "bundle_planning",
+        "feasibility_filter",
+        "joint_ranking",
+        "decision_explanation",
+        "memory_recall",
+    ],
     "tokencost": ["usage_analyze", "model_compare", "saving_estimate", "optimization_recommend"],
     "robotclaw": ["intent_order", "vehicle_match", "proposal_score", "contract_form"],
     "procurement": ["intent_parse", "supplier_compare", "compliance_review", "multi_dim_score", "recommendation"],
@@ -67,6 +82,13 @@ _SCENARIO_CAPABILITIES: dict[str, list[str]] = {
 _SCENARIO_WEIGHTS: dict[str, dict[str, float]] = {
     "lifegoal": {"growth": 0.25, "income": 0.25, "fulfillment": 0.20, "stability": 0.15, "balance": 0.15},
     "travel": {"price": 0.4, "time": 0.35, "comfort": 0.25},
+    "hotel_biztravel": {
+        "price": 0.20,
+        "eta": 0.30,
+        "detour_cost": 0.20,
+        "preference_match": 0.20,
+        "experience_value": 0.10,
+    },
     "tokencost": {"cost": 0.5, "quality": 0.35, "speed": 0.15},
     "robotclaw": {"safety": 0.4, "eta": 0.25, "cost": 0.2, "compliance": 0.15},
     "procurement": {"cost": 0.28, "quality": 0.24, "delivery": 0.16, "compliance": 0.22, "risk": 0.10},
@@ -79,6 +101,11 @@ _SCENARIO_GOVERNANCE: dict[str, dict[str, Any]] = {
         "stop_profile": "balanced",
     },
     "travel": {
+        "requires_audit": False,
+        "approval_mode": "default",
+        "stop_profile": "balanced",
+    },
+    "hotel_biztravel": {
         "requires_audit": False,
         "approval_mode": "default",
         "stop_profile": "balanced",
@@ -106,6 +133,7 @@ _SCENARIO_RECOMMENDED_TOOLS: dict[str, list[str]] = {
         "save_decision", "decision_score", "biz_execute",
     ],
     "travel": ["biz_execute", "travel_recommend", "travel_compare", "biz_plan", "biz_score"],
+    "hotel_biztravel": ["biz_execute", "decision_score", "biz_plan", "biz_score"],
     "tokencost": ["biz_execute", "tokencost_analyze", "biz_plan", "biz_score"],
     "robotclaw": ["biz_execute", "robotclaw_dispatch", "biz_plan", "biz_score"],
     "procurement": ["biz_execute", "biz_run_scenario", "biz_plan", "biz_score"],
@@ -152,6 +180,8 @@ def infer_scenario(query: str, scenario: str | None = None) -> str:
         return scenario
 
     lowered = query.lower()
+    if _looks_like_hotel_biztravel_query(lowered):
+        return "hotel_biztravel"
     for candidate, keywords in _SCENARIO_KEYWORDS.items():
         if any(keyword in lowered for keyword in keywords):
             return candidate
@@ -306,6 +336,8 @@ def run_scenario(scenario: str, payload: dict[str, Any]) -> dict[str, Any]:
         return _run_lifegoal_scenario(payload)
     if scenario == "travel":
         return _run_travel_scenario(payload)
+    if scenario == "hotel_biztravel":
+        return _run_hotel_biztravel_scenario(payload)
     if scenario == "tokencost":
         return _run_tokencost_scenario(payload)
     if scenario == "robotclaw":
@@ -768,6 +800,18 @@ def _run_procurement_scenario(payload: dict[str, Any]) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
+def _run_hotel_biztravel_scenario(payload: dict[str, Any]) -> dict[str, Any]:
+    """执行酒店 / 商旅共享决策场景。
+
+    这一层只负责把 payload 归一成共享决策请求，再把结果回给平台层；
+    具体的 bundle 可行性过滤和联合排序交给决策内核。
+    """
+
+    request = build_bundle_decision_request(payload)
+    response: BundleDecisionResponse = evaluate_bundle_decision(request)
+    return response.model_dump(mode="json")
+
+
 def _build_procurement_option_from_graph(
     *,
     normalized_option: DecisionOptionSchema,
@@ -1000,6 +1044,44 @@ def _build_procurement_option(
         normalized_option=normalized_option,
         metadata={"evidence_refs": evidence_refs},
     )
+
+
+def _looks_like_hotel_biztravel_query(query: str) -> bool:
+    """识别是否需要进入酒店 / 商旅共享决策场景。
+
+    这里要避免把普通的 travel 查询误路由到 bundle 场景，
+    所以只在明确出现礼宾、鲜花、咖啡、接送、联合决策等组合信号时才命中。
+    """
+
+    bundle_signals = (
+        "鲜花",
+        "花束",
+        "咖啡",
+        "接送",
+        "礼宾",
+        "餐厅",
+        "bundle",
+        "组合方案",
+        "联合决策",
+        "行程套餐",
+        "附加服务",
+    )
+    travel_anchor = (
+        "酒店",
+        "商旅",
+        "差旅",
+        "出差",
+        "机场",
+        "航班",
+        "行程",
+        "旅程",
+    )
+
+    if "hotel_biztravel" in query or "bundle_rank" in query:
+        return True
+    if any(signal in query for signal in bundle_signals) and any(anchor in query for anchor in travel_anchor):
+        return True
+    return False
 
 
 def _build_procurement_metrics(
