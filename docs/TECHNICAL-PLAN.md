@@ -377,7 +377,7 @@ class CheckPolicyTool(BaseTool):
 | 步骤 | 内容 |
 |------|------|
 | 2.1 | SmartSearchTool (统一搜索接口) |
-| 2.2 | 商旅数据源（`meituan-travel`、优惠券能力与后续 provider adapters 集成） |
+| 2.2 | 商旅数据源（SkillHub 真实 skills：`meituan` / `meituan-hot-trend` / `meituan-coupon-auto`、`coupon` / `coupons` / `obtain-coupons-all-in-one` / `obtain-takeout-coupon`、`tripgenie` / `stayforge-api` / `tuniu-hotel`、`cabin` / `flight-search-fast` 与后续 provider adapters 集成） |
 | 2.3 | TokenCost 数据源 (模型定价库 + 用量 API) |
 | 2.4 | OpenClaw 数据源 (车辆注册 + DispatchEngine 集成) |
 | 2.5 | PriceTrendTool |

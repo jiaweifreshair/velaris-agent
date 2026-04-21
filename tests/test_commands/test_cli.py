@@ -43,6 +43,45 @@ def test_cli_lifegoal_demo_save_to(tmp_path):
     assert "Demo 结果已保存到:" in result.output
 
 
+def test_cli_skillhub_demo_prepares_frontend_and_report(tmp_path, monkeypatch):
+    """SkillHub demo 命令应先同步 skills，再生成演示页并传给前端。"""
+
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    captured: dict[str, object] = {}
+
+    async def fake_install_skills(*, include_internal: bool = False, force: bool = False):
+        del force
+        assert include_internal is False
+        return ["meituan", "coupon"]
+
+    async def fake_run_repl(**kwargs):
+        captured.update(kwargs)
+        return None
+
+    monkeypatch.setattr(
+        "openharness.skills.skillhub_demo.ensure_skillhub_demo_skills_installed",
+        fake_install_skills,
+    )
+    monkeypatch.setattr("openharness.ui.app.run_repl", fake_run_repl)
+
+    runner = CliRunner()
+    report_path = tmp_path / "skillhub-demo.md"
+    result = runner.invoke(
+        app,
+        ["demo", "skillhub", "--case", "1", "--save-to", str(report_path)],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.exists()
+    report = report_path.read_text(encoding="utf-8")
+    assert "SkillHub 内部演示台" in report
+    assert "local-life-agent" in report
+    assert captured["demo_mode"] == "skillhub"
+    assert captured["demo_case_index"] == 0
+    assert captured["demo_cases"][0]["case_id"] == "local-life"
+    assert captured["prompt"].startswith("帮我在机场附近找")
+
+
 def test_cli_provider_list():
     """Provider 列表应包含内置预设。"""
 

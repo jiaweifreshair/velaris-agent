@@ -10,6 +10,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 from openharness.config.paths import get_config_dir
+from openharness.coordinator.skill_routing import DOMAIN_SKILL_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -367,6 +368,28 @@ _WORKER_SYSTEM_PROMPT = (
     "your changes and report the commit hash."
 )
 
+
+def _build_domain_skill_agent_prompt(domain_name: str, skill_slugs: tuple[str, ...]) -> str:
+    """生成领域 skill agent 的 system prompt，强调本域调度与结构化候选输出。"""
+    skill_lines = "\n".join(f"- {slug}" for slug in skill_slugs)
+    return f"""You are the {domain_name} domain agent for Velaris-Agent.
+
+Your job is to:
+- Use the Skill tool to call the real SkillHub skills in this domain.
+- Gather top-k candidates and normalize them into structured output.
+- Keep the response within this domain; do not make cross-domain bundle decisions.
+- Preserve hard constraints, costs, ETA, availability, and reasons.
+- Do not leak supplier-private protocol details.
+
+Allowed skills:
+{skill_lines}
+
+Output requirements:
+- Return structured candidate sets.
+- Include selection evidence, rejections, and notable uncertainty.
+- Hand off to the shared decision core for any bundle ranking.
+"""
+
 _STATUSLINE_SYSTEM_PROMPT = """You are a status line setup agent for Claude Code. Your job is to create or update the statusLine command in the user's Claude Code settings.
 
 When asked to convert the user's shell PS1 configuration, follow these steps:
@@ -595,6 +618,68 @@ _BUILTIN_AGENTS: list[AgentDefinition] = [
         tools=None,  # all tools
         system_prompt=_WORKER_SYSTEM_PROMPT,
         subagent_type="worker",
+        source="builtin",
+        base_dir="built-in",
+    ),
+    AgentDefinition(
+        name="local-life-agent",
+        description=(
+            "Use this agent for Meituan local-life merchant, delivery, and coupon comparison "
+            "tasks."
+        ),
+        tools=["*"],
+        skills=list(DOMAIN_SKILL_MAP["local-life-agent"]),
+        system_prompt=_build_domain_skill_agent_prompt(
+            "local-life",
+            DOMAIN_SKILL_MAP["local-life-agent"],
+        ),
+        subagent_type="local-life-agent",
+        source="builtin",
+        base_dir="built-in",
+    ),
+    AgentDefinition(
+        name="coupon-agent",
+        description=(
+            "Use this agent for coupon discovery, coupon eligibility, and coupon comparison "
+            "tasks."
+        ),
+        tools=["*"],
+        skills=list(DOMAIN_SKILL_MAP["coupon-agent"]),
+        system_prompt=_build_domain_skill_agent_prompt(
+            "coupon",
+            DOMAIN_SKILL_MAP["coupon-agent"],
+        ),
+        subagent_type="coupon-agent",
+        source="builtin",
+        base_dir="built-in",
+    ),
+    AgentDefinition(
+        name="travel-agent",
+        description=(
+            "Use this agent for hotel, itinerary, and bundled travel tasks."
+        ),
+        tools=["*"],
+        skills=list(DOMAIN_SKILL_MAP["travel-agent"]),
+        system_prompt=_build_domain_skill_agent_prompt(
+            "travel",
+            DOMAIN_SKILL_MAP["travel-agent"],
+        ),
+        subagent_type="travel-agent",
+        source="builtin",
+        base_dir="built-in",
+    ),
+    AgentDefinition(
+        name="flight-agent",
+        description=(
+            "Use this agent for flight search, cabin comparison, and schedule tasks."
+        ),
+        tools=["*"],
+        skills=list(DOMAIN_SKILL_MAP["flight-agent"]),
+        system_prompt=_build_domain_skill_agent_prompt(
+            "flight",
+            DOMAIN_SKILL_MAP["flight-agent"],
+        ),
+        subagent_type="flight-agent",
         source="builtin",
         base_dir="built-in",
     ),

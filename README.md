@@ -389,7 +389,9 @@ export VELARIS_BASE_URL=https://api.moonshot.ai/v1
 ./scripts/run_pytest.sh \
   tests/test_memory/test_preference_learner.py \
   tests/test_tools/test_decision_tools.py \
-  tests/test_tools/test_lifegoal_tool.py -q
+  tests/test_tools/test_lifegoal_tool.py \
+  tests/test_biz/test_engine_hotel_biztravel.py \
+  tests/test_biz/test_hotel_biztravel_inference.py -q
 ```
 
 > Apple Silicon 说明：仓库内 `.venv/bin/python` 可能默认以 `x86_64` 启动，`./scripts/run_pytest.sh` 会优先强制使用 arm64 解释器，避免 `pydantic_core` 一类二进制依赖出现架构不兼容。
@@ -437,6 +439,31 @@ uv run python scripts/run_lifegoal_demo.py
 
 ---
 
+## Hotel / Biztravel Shared Decision Demo
+
+### Demo 覆盖了什么
+
+酒店 / 商旅共享决策 demo 当前已经打通这条主链：
+
+1. `hotel_biztravel` 场景识别后进入共享决策内核，而不是继续走普通 travel 平面排序
+2. `domain_rank` 输出同类候选店铺摘要、低置信度需求推断和写回提示
+3. `bundle_rank` 输出跨类 bundle 摘要、联合排序结果和结构化决策依据
+4. 用户确认后把真实选择回写到 `DecisionMemory`，供后续 `recall_preferences` 和 `PreferenceLearner` 继续学习
+
+### 设计原则
+
+- 同类问题只给候选集，不把 supplier 私有协议暴露给决策层
+- 跨类问题先由确定性的 bundle planner 做硬约束过滤，再交给共享决策内核排序
+- `save_decision` 只记录真实选择和可解释上下文，不把隐式推断写进知识库
+
+### 对应测试
+
+- `tests/test_biz/test_engine_hotel_biztravel.py`
+- `tests/test_biz/test_hotel_biztravel_inference.py`
+- `tests/test_memory/test_preference_learner.py`
+
+---
+
 ## Decision Tools
 
 ### 记忆类
@@ -445,7 +472,7 @@ uv run python scripts/run_lifegoal_demo.py
 |------|------|
 | `recall_preferences` | 召回用户历史偏好 - 个性化权重 + 行为模式 + 满意度 |
 | `recall_decisions` | 检索相似历史决策 - "上次类似情况怎么选的, 结果如何" |
-| `save_decision` | 保存完整决策快照 - 意图/选项/推荐/权重/工具调用 |
+| `save_decision` | 保存完整决策快照 - 意图/候选摘要/推荐/权重/工具调用/写回提示 |
 
 ### 决策类
 

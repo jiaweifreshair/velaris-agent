@@ -60,6 +60,19 @@ async def test_launch_react_tui_forwards_runtime_overrides(tmp_path, monkeypatch
         base_url="https://api.openai.com/v1",
         system_prompt="system",
         auto_compact_threshold_tokens=2048,
+        demo_mode="skillhub",
+        demo_case_index=1,
+        demo_cases=[
+            {
+                "case_id": "local-life",
+                "title": "送机前买花",
+                "query": "帮我在机场附近找 3 家美团花店。",
+                "skill_slugs": ["meituan"],
+                "route_agents": ["local-life-agent"],
+                "description": "demo",
+                "internal_only": False,
+            }
+        ],
     )
 
     frontend_config = json.loads(captured["kwargs"]["env"]["VELARIS_FRONTEND_CONFIG"])  # type: ignore[index]
@@ -72,6 +85,9 @@ async def test_launch_react_tui_forwards_runtime_overrides(tmp_path, monkeypatch
     assert "--auto-compact-threshold-tokens" in backend_command
     assert "2048" in backend_command
     assert frontend_config["initial_prompt"] == "hi"
+    assert frontend_config["demo_mode"] == "skillhub"
+    assert frontend_config["demo_case_index"] == 1
+    assert frontend_config["demo_cases"][0]["case_id"] == "local-life"
 
 
 @pytest.mark.asyncio
@@ -112,8 +128,18 @@ async def test_run_repl_uses_react_launcher_by_default(monkeypatch):
         return 0
 
     monkeypatch.setattr("openharness.ui.app.launch_react_tui", _launch)
-    await run_repl(prompt="hi", cwd="/tmp/demo", model="kimi-k2.5")
+    await run_repl(
+        prompt="hi",
+        cwd="/tmp/demo",
+        model="kimi-k2.5",
+        demo_mode="skillhub",
+        demo_case_index=2,
+        demo_cases=[{"case_id": "travel-bundle"}],
+    )
 
     assert seen["prompt"] == "hi"
     assert seen["cwd"] == "/tmp/demo"
     assert seen["model"] == "kimi-k2.5"
+    assert seen["demo_mode"] == "skillhub"
+    assert seen["demo_case_index"] == 2
+    assert seen["demo_cases"] == [{"case_id": "travel-bundle"}]

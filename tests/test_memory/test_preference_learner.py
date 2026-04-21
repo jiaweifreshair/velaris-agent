@@ -44,6 +44,57 @@ def _make_record(
     )
 
 
+def _make_hotel_biztravel_record(
+    decision_id: str,
+    user_id: str = "u1",
+    recommended_id: str = "bundle-a",
+    chosen_id: str | None = None,
+    feedback: float | None = None,
+) -> DecisionRecord:
+    """构造酒店 / 商旅 bundle 场景的历史决策记录。"""
+
+    chosen_id = chosen_id or recommended_id
+    return DecisionRecord(
+        decision_id=decision_id,
+        user_id=user_id,
+        scenario="hotel_biztravel",
+        query="酒店、咖啡和接送 bundle 推荐",
+        recommended={"id": recommended_id, "label": f"方案{recommended_id}"},
+        user_choice={"id": chosen_id, "label": f"方案{chosen_id}"},
+        user_feedback=feedback,
+        scores=[
+            {
+                "id": "bundle-a",
+                "scores": {
+                    "price": 0.82,
+                    "eta": 0.90,
+                    "detour_cost": 0.94,
+                    "preference_match": 0.70,
+                    "experience_value": 0.62,
+                },
+            },
+            {
+                "id": "bundle-b",
+                "scores": {
+                    "price": 0.68,
+                    "eta": 0.74,
+                    "detour_cost": 0.77,
+                    "preference_match": 0.92,
+                    "experience_value": 0.86,
+                },
+            },
+        ],
+        weights_used={
+            "price": 0.20,
+            "eta": 0.30,
+            "detour_cost": 0.20,
+            "preference_match": 0.20,
+            "experience_value": 0.10,
+        },
+        created_at=datetime.now(timezone.utc),
+    )
+
+
 def test_no_history_returns_defaults(tmp_path: Path):
     """新用户获得场景默认权重, confidence=0。"""
     mem = DecisionMemory(base_dir=tmp_path / "decisions")
@@ -53,6 +104,50 @@ def test_no_history_returns_defaults(tmp_path: Path):
     assert prefs.total_decisions == 0
     assert prefs.confidence == 0.0
     assert prefs.weights == DEFAULT_WEIGHTS["travel"]
+
+
+def test_no_history_hotel_biztravel_returns_domain_defaults(tmp_path: Path):
+    """酒店 / 商旅场景无历史时应返回共享决策默认权重。"""
+
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    learner = PreferenceLearner(mem)
+
+    prefs = learner.compute_preferences("biz-user", "hotel_biztravel")
+    assert prefs.total_decisions == 0
+    assert prefs.confidence == 0.0
+    assert prefs.weights == {
+        "price": 0.20,
+        "eta": 0.30,
+        "detour_cost": 0.20,
+        "preference_match": 0.20,
+        "experience_value": 0.10,
+    }
+
+
+def test_learns_hotel_biztravel_preferences_from_confirmed_choices(tmp_path: Path):
+    """用户反复确认 bundle 方案后，应学习到酒店 / 商旅场景偏好。"""
+
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    learner = PreferenceLearner(mem)
+
+    default_weights = DEFAULT_WEIGHTS["hotel_biztravel"]
+    for i in range(10):
+        mem.save(
+            _make_hotel_biztravel_record(
+                decision_id=f"hotel-biz-{i:03d}",
+                recommended_id="bundle-a",
+                chosen_id="bundle-b",
+                feedback=4.5,
+            )
+        )
+
+    prefs = learner.compute_preferences("u1", "hotel_biztravel")
+
+    assert prefs.total_decisions == 10
+    assert prefs.accepted_recommendation_rate == 0.0
+    assert prefs.weights["preference_match"] > default_weights["preference_match"]
+    assert prefs.weights["experience_value"] > default_weights["experience_value"]
+    assert prefs.weights["price"] < default_weights["price"]
 
 
 def test_no_history_unknown_scenario(tmp_path: Path):

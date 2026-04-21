@@ -52,6 +52,7 @@ Velaris 自己补上的，是“决策智能”这层业务内核：
   -> run_scenario / 领域工具 执行评分和筛选
   -> OutcomeStore 回写结果摘要与指标
   -> save_decision 持久化本次决策
+  -> hotel_biztravel 场景再把候选摘要 / bundle 摘要 / 需求推断写回学习样本
   -> PreferenceLearner 在后续决策中更新个性化权重
 ```
 
@@ -78,6 +79,7 @@ Velaris 自己补上的，是“决策智能”这层业务内核：
 | 场景数据源 adapter | `src/velaris_agent/adapters/*.py` |
 | 决策工具封装 | `src/openharness/tools/decision_score_tool.py`、`recall_*_tool.py`、`save_decision_tool.py` |
 | 领域工具封装 | `src/openharness/tools/travel_recommend_tool.py`、`tokencost_analyze_tool.py`、`robotclaw_dispatch_tool.py`、`lifegoal_tool.py` |
+| 酒店 / 商旅共享决策后处理 | `src/velaris_agent/biz/hotel_biztravel_inference.py` |
 
 ### 4.2 兼容导出层
 
@@ -95,6 +97,7 @@ Velaris 自己补上的，是“决策智能”这层业务内核：
 | 场景 | 核心目标 | 当前执行入口 |
 |---|---|---|
 | `travel` | 预算/时效/舒适度权衡的商旅推荐 | `travel_recommend` / `biz_execute` |
+| `hotel_biztravel` | 多店候选 + bundle 联合排序 + 确认后偏好回写 | `hotel_biztravel` / `biz_execute` |
 | `tokencost` | API 成本分析与降本建议排序 | `tokencost_analyze` / `biz_execute` |
 | `robotclaw` | 派单提案打分、治理约束、合约就绪判断 | `robotclaw_dispatch` / `biz_execute` |
 
@@ -263,6 +266,7 @@ sequenceDiagram
 3. `src/velaris_agent/memory/preference_learner.py`
 
 - 如果新场景需要个性化权重学习，必须把默认权重加到 `DEFAULT_WEIGHTS`。
+- 酒店 / 商旅共享决策场景已按 `price / eta / detour_cost / preference_match / experience_value` 对齐默认权重，避免写回后学习维度漂移。
 
 否则 `recall_preferences` 和 `decision_score(user_id=..., scenario=...)` 无法输出稳定的个性化权重。
 

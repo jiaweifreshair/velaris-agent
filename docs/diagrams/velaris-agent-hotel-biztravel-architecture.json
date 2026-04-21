@@ -1,0 +1,473 @@
+{
+  "template_type": "architecture",
+  "style": 6,
+  "width": 1400,
+  "height": 920,
+  "style_overrides": {
+    "title_align": "center"
+  },
+  "title": "Velaris-Agent · 酒店用户 / 商旅用户目标态架构",
+  "subtitle": "让 velaris-agent 成为共享决策内核：接收候选集，做联合排序，输出可解释依据，而不是直接承接强运营履约",
+  "containers": [
+    {
+      "x": 70,
+      "y": 120,
+      "width": 1260,
+      "height": 92,
+      "label": "",
+      "side_label": "Upstream Surface",
+      "side_label_x": 26,
+      "side_label_anchor": "start",
+      "subtitle": "",
+      "stroke": "#ded8cf",
+      "fill": "none"
+    },
+    {
+      "x": 70,
+      "y": 244,
+      "width": 1260,
+      "height": 116,
+      "label": "",
+      "side_label": "Candidate Ecosystem",
+      "side_label_x": 26,
+      "side_label_anchor": "start",
+      "subtitle": "",
+      "stroke": "#ded8cf",
+      "fill": "none"
+    },
+    {
+      "x": 70,
+      "y": 392,
+      "width": 1260,
+      "height": 128,
+      "label": "",
+      "side_label": "Decision Input",
+      "side_label_x": 26,
+      "side_label_anchor": "start",
+      "subtitle": "",
+      "stroke": "#ded8cf",
+      "fill": "none"
+    },
+    {
+      "x": 70,
+      "y": 552,
+      "width": 1260,
+      "height": 160,
+      "label": "",
+      "side_label": "Decision Core",
+      "side_label_x": 26,
+      "side_label_anchor": "start",
+      "subtitle": "",
+      "stroke": "#ded8cf",
+      "fill": "none"
+    },
+    {
+      "x": 70,
+      "y": 744,
+      "width": 1260,
+      "height": 136,
+      "label": "",
+      "side_label": "Governance + Learning",
+      "side_label_x": 26,
+      "side_label_anchor": "start",
+      "subtitle": "",
+      "stroke": "#ded8cf",
+      "fill": "none"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "hotel_chat",
+      "kind": "rect",
+      "x": 120,
+      "y": 142,
+      "width": 210,
+      "height": 48,
+      "label": "酒店会员礼宾 Chat",
+      "type_label": "ENTRY",
+      "fill": "#e9f1fb",
+      "stroke": "#8c6f5a",
+      "flat": true
+    },
+    {
+      "id": "biz_chat",
+      "kind": "rect",
+      "x": 380,
+      "y": 142,
+      "width": 230,
+      "height": 48,
+      "label": "商旅订阅 / 企业差旅入口",
+      "type_label": "ENTRY",
+      "fill": "#e9f1fb",
+      "stroke": "#8c6f5a",
+      "flat": true
+    },
+    {
+      "id": "platform",
+      "kind": "double_rect",
+      "x": 860,
+      "y": 132,
+      "width": 280,
+      "height": 68,
+      "label": "velaris-platform-agent",
+      "type_label": "ORCHESTRATION",
+      "fill": "#f7ecda",
+      "stroke": "#d97757"
+    },
+    {
+      "id": "travel_domain",
+      "kind": "rect",
+      "x": 120,
+      "y": 272,
+      "width": 250,
+      "height": 56,
+      "label": "Travel / Hotel Domain Agents",
+      "type_label": "TOP-K CANDIDATES",
+      "fill": "#e5e8df",
+      "stroke": "#7b8b5c",
+      "flat": true
+    },
+    {
+      "id": "local_skills",
+      "kind": "rect",
+      "x": 460,
+      "y": 272,
+      "width": 280,
+      "height": 56,
+      "label": "Flower / Coffee / Car / Dining Skills",
+      "type_label": "TOP-K CANDIDATES",
+      "fill": "#e5e8df",
+      "stroke": "#7b8b5c",
+      "flat": true
+    },
+    {
+      "id": "supplier_contracts",
+      "kind": "rect",
+      "x": 920,
+      "y": 264,
+      "width": 250,
+      "height": 72,
+      "label": "签约酒店 / 航司 / 本地服务能力",
+      "type_label": "SUPPLY",
+      "fill": "#efe8de",
+      "stroke": "#d0c3b3",
+      "flat": true
+    },
+    {
+      "id": "goal_context",
+      "kind": "rect",
+      "x": 110,
+      "y": 424,
+      "width": 270,
+      "height": 64,
+      "label": "Goal + Tenant Context Compiler",
+      "type_label": "CONTEXT",
+      "fill": "#f7ecda",
+      "stroke": "#d0b893",
+      "flat": true
+    },
+    {
+      "id": "normalizer",
+      "kind": "double_rect",
+      "x": 470,
+      "y": 416,
+      "width": 300,
+      "height": 80,
+      "label": "Candidate Contract Normalizer",
+      "type_label": "STANDARD CONTRACT",
+      "fill": "#c8e4db",
+      "stroke": "#8c6f5a"
+    },
+    {
+      "id": "policy_overlay",
+      "kind": "rect",
+      "x": 900,
+      "y": 424,
+      "width": 250,
+      "height": 64,
+      "label": "Policy Overlay",
+      "type_label": "HOTEL / ORG RULES",
+      "fill": "#efe8de",
+      "stroke": "#d0c3b3",
+      "flat": true
+    },
+    {
+      "id": "bundle_planner",
+      "kind": "rect",
+      "x": 100,
+      "y": 592,
+      "width": 280,
+      "height": 72,
+      "label": "Feasibility + Bundle Planner",
+      "type_label": "HARD FILTER",
+      "fill": "#f7ecda",
+      "stroke": "#d0b893",
+      "flat": true
+    },
+    {
+      "id": "decision_graph",
+      "kind": "double_rect",
+      "x": 470,
+      "y": 576,
+      "width": 320,
+      "height": 104,
+      "label": "Decision Graph",
+      "sublabel": "domain_rank + bundle_rank + Pareto + bias audit",
+      "type_label": "SHARED CORE",
+      "fill": "#c8e4db",
+      "stroke": "#8c6f5a"
+    },
+    {
+      "id": "basis_builder",
+      "kind": "rect",
+      "x": 900,
+      "y": 592,
+      "width": 280,
+      "height": 72,
+      "label": "Decision Basis Builder",
+      "type_label": "EXPLANATION",
+      "fill": "#efe8de",
+      "stroke": "#d0c3b3",
+      "flat": true
+    },
+    {
+      "id": "router_gate",
+      "kind": "rect",
+      "x": 100,
+      "y": 780,
+      "width": 260,
+      "height": 60,
+      "label": "Router + Authority + Audit Gate",
+      "type_label": "GOVERNANCE",
+      "fill": "#efe8de",
+      "stroke": "#d0c3b3",
+      "flat": true
+    },
+    {
+      "id": "decision_memory",
+      "kind": "cylinder",
+      "x": 470,
+      "y": 758,
+      "width": 320,
+      "height": 104,
+      "label": "DecisionMemory + PreferenceLearner",
+      "sublabel": "user preference + tenant policy + prior outcomes",
+      "fill": "#e5e8df",
+      "stroke": "#7b8b5c"
+    },
+    {
+      "id": "outcome_store",
+      "kind": "rect",
+      "x": 900,
+      "y": 780,
+      "width": 280,
+      "height": 60,
+      "label": "OutcomeStore + TaskLedger",
+      "type_label": "FEEDBACK",
+      "fill": "#efe8de",
+      "stroke": "#d0c3b3",
+      "flat": true
+    }
+  ],
+  "arrows": [
+    {
+      "source": "hotel_chat",
+      "target": "platform",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "read",
+      "route_points": [[330, 166], [740, 166], [860, 166]]
+    },
+    {
+      "source": "biz_chat",
+      "target": "platform",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "read"
+    },
+    {
+      "source": "platform",
+      "target": "travel_domain",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "collect top-k",
+      "route_points": [[930, 212], [930, 244], [240, 244], [240, 272]]
+    },
+    {
+      "source": "platform",
+      "target": "local_skills",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "collect top-k",
+      "route_points": [[1000, 212], [1000, 236], [600, 236], [600, 272]]
+    },
+    {
+      "source": "travel_domain",
+      "target": "supplier_contracts",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "dashed": true,
+      "label": "signed supply"
+    },
+    {
+      "source": "local_skills",
+      "target": "supplier_contracts",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "dashed": true,
+      "route_points": [[740, 300], [800, 300], [800, 300], [920, 300]]
+    },
+    {
+      "source": "platform",
+      "target": "goal_context",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "read",
+      "label": "query + tenant + session",
+      "route_points": [[1080, 212], [1080, 392], [245, 392], [245, 424]]
+    },
+    {
+      "source": "travel_domain",
+      "target": "normalizer",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "data",
+      "route_points": [[245, 328], [245, 376], [620, 376], [620, 416]]
+    },
+    {
+      "source": "local_skills",
+      "target": "normalizer",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "data",
+      "route_points": [[600, 328], [600, 376], [650, 376], [650, 416]]
+    },
+    {
+      "source": "goal_context",
+      "target": "normalizer",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control",
+      "label": "constraints",
+      "route_points": [[380, 456], [425, 456], [425, 456], [470, 456]]
+    },
+    {
+      "source": "goal_context",
+      "target": "policy_overlay",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "read",
+      "label": "tenant context",
+      "route_points": [[380, 446], [620, 446], [620, 446], [900, 446]]
+    },
+    {
+      "source": "policy_overlay",
+      "target": "bundle_planner",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "hard rules",
+      "route_points": [[1025, 488], [1025, 540], [240, 540], [240, 592]]
+    },
+    {
+      "source": "normalizer",
+      "target": "bundle_planner",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "read",
+      "label": "candidate sets",
+      "route_points": [[620, 496], [620, 540], [240, 540], [240, 592]]
+    },
+    {
+      "source": "bundle_planner",
+      "target": "decision_graph",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "read",
+      "label": "feasible bundles"
+    },
+    {
+      "source": "decision_graph",
+      "target": "basis_builder",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data",
+      "label": "selected + alternatives"
+    },
+    {
+      "source": "router_gate",
+      "target": "decision_graph",
+      "source_port": "top",
+      "target_port": "bottom",
+      "flow": "control",
+      "dashed": true,
+      "label": "gate / audit",
+      "route_points": [[230, 780], [230, 720], [630, 720], [630, 680]]
+    },
+    {
+      "source": "decision_memory",
+      "target": "decision_graph",
+      "source_port": "top",
+      "target_port": "bottom",
+      "flow": "read",
+      "dashed": true,
+      "label": "preferences + policy + history",
+      "route_points": [[630, 758], [630, 720], [680, 720], [680, 680]]
+    },
+    {
+      "source": "decision_graph",
+      "target": "decision_memory",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "write",
+      "dashed": true,
+      "label": "trace / feedback hooks",
+      "route_points": [[580, 680], [580, 720], [560, 720], [560, 758]]
+    },
+    {
+      "source": "basis_builder",
+      "target": "platform",
+      "source_port": "top",
+      "target_port": "bottom",
+      "flow": "read",
+      "label": "proposal + decision basis",
+      "route_points": [[1040, 592], [1040, 352], [1040, 352], [1040, 200]]
+    },
+    {
+      "source": "basis_builder",
+      "target": "outcome_store",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "feedback",
+      "dashed": true,
+      "label": "decision snapshot",
+      "route_points": [[1040, 664], [1040, 722], [1040, 722], [1040, 780]]
+    },
+    {
+      "source": "outcome_store",
+      "target": "decision_memory",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "feedback",
+      "dashed": true,
+      "label": "execution outcomes",
+      "route_points": [[900, 810], [850, 810], [850, 810], [790, 810]]
+    }
+  ],
+  "legend": [
+    { "flow": "read", "label": "主请求 / 排序路径" },
+    { "flow": "control", "label": "治理与硬约束" },
+    { "flow": "data", "label": "结构化决策结果" },
+    { "flow": "write", "label": "记忆回写" },
+    { "flow": "feedback", "label": "执行反馈闭环" }
+  ],
+  "legend_position": "bottom-right",
+  "legend_box": true,
+  "legend_box_fill": "#fffaf3",
+  "legend_y": 834,
+  "footer": "Velaris-Agent 的职责是“联合决策 + 解释 + 学习”，不是“直接做强运营履约”"
+}

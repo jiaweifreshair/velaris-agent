@@ -114,6 +114,9 @@ async def launch_react_tui(
     system_prompt: str | None = None,
     api_key: str | None = None,
     auto_compact_threshold_tokens: int | None = None,
+    demo_mode: str | None = None,
+    demo_case_index: int | None = None,
+    demo_cases: list[dict[str, object]] | None = None,
 ) -> int:
     """Launch the React terminal frontend as the default UI."""
     frontend_dir = get_frontend_dir()
@@ -135,21 +138,26 @@ async def launch_react_tui(
             raise RuntimeError("Failed to install React terminal frontend dependencies")
 
     env = os.environ.copy()
-    frontend_config = json.dumps(
-            {
-                "backend_command": build_backend_command(
-                    cwd=cwd or str(Path.cwd()),
-                    model=model,
-                    provider=provider,
-                    api_format=api_format,
-                    base_url=base_url,
-                    system_prompt=system_prompt,
-                    api_key=api_key,
-                    auto_compact_threshold_tokens=auto_compact_threshold_tokens,
-                ),
-                "initial_prompt": prompt,
-            }
-        )
+    frontend_config_payload: dict[str, object] = {
+        "backend_command": build_backend_command(
+            cwd=cwd or str(Path.cwd()),
+            model=model,
+            provider=provider,
+            api_format=api_format,
+            base_url=base_url,
+            system_prompt=system_prompt,
+            api_key=api_key,
+            auto_compact_threshold_tokens=auto_compact_threshold_tokens,
+        ),
+        "initial_prompt": prompt,
+    }
+    if demo_mode is not None:
+        frontend_config_payload["demo_mode"] = demo_mode
+    if demo_case_index is not None:
+        frontend_config_payload["demo_case_index"] = demo_case_index
+    if demo_cases is not None:
+        frontend_config_payload["demo_cases"] = demo_cases
+    frontend_config = json.dumps(frontend_config_payload, ensure_ascii=False)
     env["VELARIS_FRONTEND_CONFIG"] = frontend_config
     env["OPENHARNESS_FRONTEND_CONFIG"] = frontend_config
     if api_key:

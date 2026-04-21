@@ -63,6 +63,49 @@ uv run python -m pytest tests/test_tools/test_biz_execute_tool.py -q
 - 查询耗时 P95 < 8s
 - 组合总价误差 <= 5%
 
+### 2.5 酒店 / 商旅共享决策
+
+#### 目标
+
+输入酒店、咖啡、接送、鲜花等多店组合需求，输出可解释的 `domain_rank` / `bundle_rank` 结果，并在用户确认后把真实选择写回 `DecisionMemory`，供偏好学习继续收敛。
+
+#### 核心链路
+
+1. `biz_execute`：识别为 `hotel_biztravel` 并进入共享决策路径。
+2. `build_capability_plan`：生成共享决策所需的能力规划与治理要求。
+3. `run_scenario(hotel_biztravel)`：输出候选摘要、bundle 摘要、需求推断和写回提示。
+4. `confirm`：用户确认后把真实选择写回决策记忆。
+5. `PreferenceLearner`：下一次读取偏好时使用 `hotel_biztravel` 默认权重与历史样本继续学习。
+
+#### 路由策略建议
+
+- 默认：`local_closed_loop`
+- 需要外部副作用或跨系统写回：按治理约束进入确认后写回流程
+
+#### 验证指标
+
+- 输出包含 `candidate_briefs` / `bundle_briefs` / `inferred_user_needs` / `writeback_hints`
+- `domain_rank` 能稳定返回同类候选摘要与结构化 `score_breakdown`
+- `bundle_rank` 能稳定返回 bundle 摘要、`selected_bundle_id` 和 `decision_trace_id`
+- 用户确认后，`save_decision` 能写入 `DecisionMemory`
+- 下一次 `recall_preferences("user", "hotel_biztravel")` 能读到历史样本
+
+#### 自动化验证
+
+```bash
+uv run python -m pytest \
+  tests/test_biz/test_engine_hotel_biztravel.py \
+  tests/test_biz/test_hotel_biztravel_inference.py \
+  tests/test_memory/test_preference_learner.py -q
+```
+
+对应断言：
+
+- `scenario == "hotel_biztravel"`
+- `writeback_hints["preference_tool"] == "save_decision"`
+- `bundle_rank` 输出 `selected_bundle_id`
+- `PreferenceLearner` 能读取 `hotel_biztravel` 默认权重并对历史样本学习
+
 ## 3. Case C：AI TokenCost
 
 ### 3.1 目标
@@ -121,6 +164,6 @@ uv run python -m pytest tests/test_tools/test_biz_execute_tool.py -q
 
 ## 6. 当前完成度
 
-- 已完成：`lifegoal / travel / tokencost / robotclaw` 四类场景的能力规划、路由治理、任务账本与 outcome 回写。
-- 已验证：`uv run python -m pytest tests/test_tools/test_biz_execute_tool.py -q` 可覆盖 `tokencost` 与 `lifegoal` 两条完整闭环。
+- 已完成：`lifegoal / travel / tokencost / robotclaw / hotel_biztravel` 五类场景的能力规划、路由治理、任务账本与 outcome 回写。
+- 已验证：`uv run python -m pytest tests/test_tools/test_biz_execute_tool.py -q` 可覆盖 `tokencost` 与 `lifegoal` 两条完整闭环；`hotel_biztravel` 已通过专用测试集与真实回归。
 - 待完成：更多真实外部 runtime 联调，以及持久化账本和更完整的 outcome 评估体系。

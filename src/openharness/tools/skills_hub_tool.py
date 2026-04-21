@@ -27,14 +27,15 @@ class SkillsHubInput(BaseModel):
 def default_sources() -> list:
     """Return the default list of skill sources.
 
-    Currently only includes the local ``optional-skills/`` directory.
-    GitHub and Tap sources are configured at runtime.
+    默认先接 SkillHub 的真实业务 skills，再接本地 ``optional-skills/``。
+    这样既能让 demo 直接命中真实供给，又保留本地扩展点。
     """
     from openharness.skills.hub import OptionalSkillSource
     from openharness.skills.loader import get_user_skills_dir
+    from openharness.skills.skillhub_source import SkillHubSource
 
     optional_dir = get_user_skills_dir()
-    return [OptionalSkillSource(optional_dir)]
+    return [SkillHubSource(), OptionalSkillSource(optional_dir)]
 
 
 class SkillsHubTool(BaseTool):

@@ -30,6 +30,15 @@ DEFAULT_WEIGHTS: dict[str, dict[str, float]] = {
     "travel": {"price": 0.40, "time": 0.35, "comfort": 0.25},
     "tokencost": {"cost": 0.50, "quality": 0.35, "speed": 0.15},
     "robotclaw": {"safety": 0.40, "eta": 0.25, "cost": 0.20, "compliance": 0.15},
+    # 酒店 / 商旅共享决策场景要和 bundle 规划器的评分字段保持一致，
+    # 这样用户确认后的回写记录才能在同一组维度上持续学习。
+    "hotel_biztravel": {
+        "price": 0.20,
+        "eta": 0.30,
+        "detour_cost": 0.20,
+        "preference_match": 0.20,
+        "experience_value": 0.10,
+    },
     **{domain: dict(weights) for domain, weights in DOMAIN_DIMENSIONS.items()},
 }
 

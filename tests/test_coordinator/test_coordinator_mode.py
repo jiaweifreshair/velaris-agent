@@ -8,6 +8,7 @@ from openharness.coordinator.coordinator_mode import (
     TaskNotification,
     WorkerConfig,
     format_task_notification,
+    get_coordinator_system_prompt,
     get_coordinator_tools,
     get_coordinator_user_context,
     is_coordinator_mode,
@@ -172,6 +173,20 @@ def test_coordinator_user_context_with_scratchpad(monkeypatch):
     monkeypatch.setenv("CLAUDE_CODE_COORDINATOR_MODE", "1")
     ctx = get_coordinator_user_context(scratchpad_dir="/tmp/scratch")
     assert "/tmp/scratch" in ctx["workerToolsContext"]
+
+
+# ---------------------------------------------------------------------------
+# get_coordinator_system_prompt
+# ---------------------------------------------------------------------------
+
+
+def test_coordinator_system_prompt_mentions_domain_agents():
+    prompt = get_coordinator_system_prompt()
+    assert "local-life-agent" in prompt
+    assert "coupon-agent" in prompt
+    assert "travel-agent" in prompt
+    assert "flight-agent" in prompt
+    assert "supplier skills" in prompt.lower()
 
 
 # ---------------------------------------------------------------------------

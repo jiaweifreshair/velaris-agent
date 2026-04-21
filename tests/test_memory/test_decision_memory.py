@@ -214,6 +214,41 @@ def test_update_feedback(tmp_path: Path):
     assert reloaded.user_choice == {"id": "opt-b", "label": "航班B"}
 
 
+def test_save_and_get_preserves_learning_fields(tmp_path: Path):
+    """决策记忆应完整保留候选摘要、需求推断和回写提示。"""
+
+    mem = DecisionMemory(base_dir=tmp_path / "decisions")
+    record = _make_record(
+        decision_id="dec-learning",
+        query="送机前买花",
+    )
+    record = record.model_copy(
+        update={
+            "candidate_briefs": [
+                {"candidate_id": "flower-1", "store_name": "机场店"},
+            ],
+            "inferred_user_needs": [
+                {
+                    "need_type": "flower_quantity",
+                    "value": 1,
+                    "confidence": 0.46,
+                }
+            ],
+            "writeback_hints": {
+                "preference_tool": "save_decision",
+                "knowledge_policy": "explicit-only",
+            },
+        }
+    )
+    mem.save(record)
+
+    got = mem.get("dec-learning")
+    assert got is not None
+    assert got.candidate_briefs[0]["store_name"] == "机场店"
+    assert got.inferred_user_needs[0]["need_type"] == "flower_quantity"
+    assert got.writeback_hints["preference_tool"] == "save_decision"
+
+
 def test_update_feedback_nonexistent(tmp_path: Path):
     """回填不存在的记录返回 None。"""
     mem = DecisionMemory(base_dir=tmp_path / "decisions")

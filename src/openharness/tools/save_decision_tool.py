@@ -23,6 +23,15 @@ class SaveDecisionInput(BaseModel):
     alternatives: list[dict[str, Any]] = Field(
         default_factory=list, description="备选方案列表"
     )
+    candidate_briefs: list[dict[str, Any]] = Field(
+        default_factory=list, description="候选店铺摘要"
+    )
+    inferred_user_needs: list[dict[str, Any]] = Field(
+        default_factory=list, description="根据 query 和候选推断出的用户需求假设"
+    )
+    writeback_hints: dict[str, Any] = Field(
+        default_factory=dict, description="偏好回写与知识库写入提示"
+    )
     weights_used: dict[str, float] = Field(
         default_factory=dict, description="本次决策使用的权重"
     )
@@ -84,6 +93,9 @@ class SaveDecisionTool(BaseTool):
                 scenario=arguments.scenario,
                 query=arguments.query,
                 options_discovered=arguments.options_discovered,
+                candidate_briefs=arguments.candidate_briefs,
+                inferred_user_needs=arguments.inferred_user_needs,
+                writeback_hints=arguments.writeback_hints,
                 weights_used=arguments.weights_used,
                 tools_called=arguments.tools_called,
                 recommended=arguments.recommended,

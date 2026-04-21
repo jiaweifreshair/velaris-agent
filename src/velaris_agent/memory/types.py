@@ -222,6 +222,15 @@ class DecisionRecord(BaseModel):
     alternatives: list[dict[str, Any]] = Field(
         default_factory=list, description="备选方案",
     )
+    candidate_briefs: list[dict[str, Any]] = Field(
+        default_factory=list, description="候选店铺摘要",
+    )
+    inferred_user_needs: list[dict[str, Any]] = Field(
+        default_factory=list, description="根据 query 和候选推断出的用户需求假设",
+    )
+    writeback_hints: dict[str, Any] = Field(
+        default_factory=dict, description="偏好回写与知识库写入提示",
+    )
     explanation: str = Field(default="", description="推荐理由")
 
     # 反馈 (异步回填)

@@ -155,6 +155,23 @@ async def test_save_decision_tool_persists(tmp_path: Path):
             query="选择最便宜的模型",
             recommended={"id": "gpt-4o-mini", "label": "GPT-4o Mini"},
             alternatives=[{"id": "gpt-4o", "label": "GPT-4o"}],
+            candidate_briefs=[
+                {
+                    "candidate_id": "gpt-4o-mini",
+                    "store_name": "GPT-4o Mini",
+                }
+            ],
+            inferred_user_needs=[
+                {
+                    "need_type": "cost_sensitivity",
+                    "value": "high",
+                    "confidence": 0.84,
+                }
+            ],
+            writeback_hints={
+                "preference_tool": "save_decision",
+                "knowledge_policy": "explicit-only",
+            },
             weights_used={"cost": 0.5, "quality": 0.35, "speed": 0.15},
             explanation="GPT-4o Mini 成本最低且质量足够",
             tools_called=["model_search"],
@@ -175,6 +192,9 @@ async def test_save_decision_tool_persists(tmp_path: Path):
     assert record.user_id == "u-save"
     assert record.scenario == "tokencost"
     assert record.recommended["id"] == "gpt-4o-mini"
+    assert record.candidate_briefs[0]["store_name"] == "GPT-4o Mini"
+    assert record.inferred_user_needs[0]["need_type"] == "cost_sensitivity"
+    assert record.writeback_hints["knowledge_policy"] == "explicit-only"
 
 
 # --- DecisionScoreTool ---
