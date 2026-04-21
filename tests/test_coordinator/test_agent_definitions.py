@@ -11,6 +11,7 @@ from openharness.coordinator.agent_definitions import (
     get_builtin_agent_definitions,
     load_agents_dir,
 )
+from openharness.coordinator.skill_routing import DOMAIN_SKILL_MAP
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,10 @@ def test_get_builtin_returns_expected_names():
     assert "Explore" in names
     assert "Plan" in names
     assert "worker" in names
+    assert "local-life-agent" in names
+    assert "coupon-agent" in names
+    assert "travel-agent" in names
+    assert "flight-agent" in names
     assert "verification" in names
 
 
@@ -79,6 +84,13 @@ def test_builtin_general_purpose_has_all_tools():
     builtins = get_builtin_agent_definitions()
     gp = next(a for a in builtins if a.name == "general-purpose")
     assert gp.tools == ["*"]  # ["*"] means all tools
+
+
+def test_builtin_domain_agents_expose_expected_skills():
+    builtins = get_builtin_agent_definitions()
+    for agent_name, skill_slugs in DOMAIN_SKILL_MAP.items():
+        agent = next(a for a in builtins if a.name == agent_name)
+        assert agent.skills == list(skill_slugs)
 
 
 # ---------------------------------------------------------------------------

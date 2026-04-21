@@ -181,6 +181,20 @@ _WORKER_TOOLS = [
 
 _SIMPLE_WORKER_TOOLS = ["bash", "file_read", "file_edit"]
 
+# 领域 skill 只允许通过 domain agent 进入，协调器不要把它们扁平化成平台能力。
+_DOMAIN_ROUTING_GUIDANCE = """### Domain Agent Routing
+
+- local-life-agent: Meituan local life, delivery, and merchant comparison tasks
+- coupon-agent: coupon discovery and eligibility tasks
+- travel-agent: hotel, itinerary, and travel bundle tasks
+- flight-agent: flight search, cabin comparison, and schedule tasks
+
+Rules:
+- Route supplier skill calls through the matching domain agent first.
+- Keep supplier skills grouped by domain; do not expose them as one giant platform capability list.
+- Let velaris-agent handle the shared decision core after domain agents collect candidates.
+"""
+
 
 def is_coordinator_mode() -> bool:
     """Return True when the process is running in coordinator mode."""
@@ -345,6 +359,8 @@ You:
 When calling {_AGENT_TOOL_NAME}, use subagent_type `worker`. Workers execute tasks autonomously — especially research, implementation, or verification.
 
 {worker_capabilities}
+
+{_DOMAIN_ROUTING_GUIDANCE}
 
 ## 4. Task Workflow
 
