@@ -4,6 +4,7 @@ import {Box, Text, useApp, useInput} from 'ink';
 import {CommandPicker} from './components/CommandPicker.js';
 import {ConversationView} from './components/ConversationView.js';
 import {ModalHost} from './components/ModalHost.js';
+import {SkillHubDemoBanner} from './components/SkillHubDemoBanner.js';
 import {PromptInput} from './components/PromptInput.js';
 import {SelectModal, type SelectOption} from './components/SelectModal.js';
 import {StatusBar} from './components/StatusBar.js';
@@ -48,6 +49,16 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 	const [pickerIndex, setPickerIndex] = useState(0);
 	const [selectModal, setSelectModal] = useState<SelectModalState>(null);
 	const [selectIndex, setSelectIndex] = useState(0);
+	const demoMode = config.demo_mode ?? null;
+	const demoCases = config.demo_cases ?? [];
+	const isSkillHubDemo = demoMode === 'skillhub' && demoCases.length > 0;
+	const [demoIndex, setDemoIndex] = useState(() => {
+		const candidate = Number(config.demo_case_index ?? 0);
+		if (demoCases.length === 0) {
+			return 0;
+		}
+		return Math.max(0, Math.min(Number.isFinite(candidate) ? candidate : 0, demoCases.length - 1));
+	});
 	const session = useBackendSession(config, () => exit());
 
 	// Current tool name for spinner
@@ -78,6 +89,14 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 	useEffect(() => {
 		setPickerIndex(0);
 	}, [commandHints.length, input]);
+
+	useEffect(() => {
+		if (!isSkillHubDemo || demoCases.length === 0) {
+			setDemoIndex(0);
+			return;
+		}
+		setDemoIndex((current) => Math.max(0, Math.min(current, demoCases.length - 1)));
+	}, [demoCases.length, isSkillHubDemo]);
 
 	// Handle backend-initiated select requests (e.g. /resume session list)
 	useEffect(() => {
@@ -230,6 +249,17 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 			return;
 		}
 
+		// --- SkillHub demo 快捷键 ---
+		if (isSkillHubDemo && !session.busy) {
+			const numeric = Number.parseInt(chunk, 10);
+			if (!Number.isNaN(numeric) && numeric >= 1 && numeric <= demoCases.length) {
+				const nextIndex = numeric - 1;
+				setDemoIndex(nextIndex);
+				setInput(demoCases[nextIndex]?.query ?? '');
+				return;
+			}
+		}
+
 		// --- Ignore input while busy ---
 		if (session.busy) {
 			return;
@@ -334,6 +364,10 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 
 	return (
 		<Box flexDirection="column" paddingX={1} height="100%">
+			{isSkillHubDemo ? (
+				<SkillHubDemoBanner cases={demoCases} selectedIndex={demoIndex} />
+			) : null}
+
 			{/* Conversation area */}
 			<Box flexDirection="column" flexGrow={1}>
 				<ConversationView

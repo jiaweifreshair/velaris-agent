@@ -504,6 +504,84 @@ def demo_lifegoal(
     print(render_lifegoal_demo_output(payload))
 
 
+@demo_app.command("skillhub")
+def demo_skillhub(
+    case: int = typer.Option(
+        1,
+        "--case",
+        "-c",
+        help="起始案例编号，从 1 开始",
+    ),
+    internal: bool = typer.Option(
+        False,
+        "--internal",
+        help="包含内部 SkillHub skills 和内部 demo case",
+    ),
+    save_to: str = typer.Option(
+        str(
+            Path(
+                "/Users/apus/Documents/UGit/smart-travel-workspace/output/"
+                "skillhub-domain-agent-demo-page.md"
+            )
+        ),
+        "--save-to",
+        help="把 demo 页面保存到指定 markdown 文件",
+    ),
+) -> None:
+    """运行 SkillHub 内部演示台。"""
+
+    from openharness.skills.skillhub_demo import (
+        build_skillhub_demo_frontend_config,
+        build_skillhub_demo_prompt,
+        ensure_skillhub_demo_skills_installed,
+        skillhub_demo_cases,
+        write_skillhub_demo_report,
+    )
+
+    import asyncio
+
+    cases = skillhub_demo_cases(include_internal=internal)
+    if not cases:
+        print("SkillHub demo 没有可用案例。")
+        raise typer.Exit(1)
+    if case < 1 or case > len(cases):
+        print(f"无效的案例编号: {case}")
+        print(f"可选范围: 1 - {len(cases)}")
+        raise typer.Exit(1)
+
+    selected_index = case - 1
+    installed = asyncio.run(
+        ensure_skillhub_demo_skills_installed(include_internal=internal)
+    )
+    report_path = write_skillhub_demo_report(
+        save_to,
+        include_internal=internal,
+        selected_case_index=selected_index,
+        installed_slugs=installed,
+    )
+    print(f"Demo page 已写入: {report_path}")
+
+    frontend_config = build_skillhub_demo_frontend_config(
+        include_internal=internal,
+        selected_case_index=selected_index,
+    )
+    prompt = build_skillhub_demo_prompt(
+        include_internal=internal,
+        selected_case_index=selected_index,
+    )
+
+    from openharness.ui.app import run_repl
+
+    asyncio.run(
+        run_repl(
+            prompt=prompt,
+            demo_mode=str(frontend_config["demo_mode"]),
+            demo_case_index=int(frontend_config["demo_case_index"]),
+            demo_cases=list(frontend_config["demo_cases"]),
+        )
+    )
+
+
 # ---- storage subcommands ----
 
 @storage_app.command("init")

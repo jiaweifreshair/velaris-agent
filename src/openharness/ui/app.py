@@ -68,6 +68,9 @@ async def run_repl(
     auto_compact_threshold_tokens: int | None = None,
     api_client: SupportsStreamingMessages | None = None,
     backend_only: bool = False,
+    demo_mode: str | None = None,
+    demo_case_index: int | None = None,
+    demo_cases: list[dict[str, object]] | None = None,
 ) -> None:
     """Run the default OpenHarness interactive application (React TUI)."""
     if backend_only:
@@ -99,6 +102,9 @@ async def run_repl(
             system_prompt=system_prompt,
             api_key=api_key,
             auto_compact_threshold_tokens=auto_compact_threshold_tokens,
+            demo_mode=demo_mode,
+            demo_case_index=demo_case_index,
+            demo_cases=demo_cases,
         )
     except ValueError as exc:
         _print_api_key_guide(exc)
