@@ -108,7 +108,7 @@ Velaris 解决的不是"让 Agent 能干活"或"让 Agent 越干越好"，而是
 ## Architecture
 
 <p align="center">
-  <img src="assets/architecture-velaris.png" alt="Velaris Decision Intelligence Architecture" width="900">
+  <img src="assets/architecture-velaris.svg" alt="Velaris Decision Intelligence Architecture" width="900">
 </p>
 
 ### 五层 + 学习闭环设计
