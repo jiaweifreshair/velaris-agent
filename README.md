@@ -107,11 +107,39 @@ Velaris 解决的不是"让 Agent 能干活"或"让 Agent 越干越好"，而是
 
 ## Architecture
 
+### 先看这 3 张图
+
+如果只看一张，先看第一张总览；如果关心落地场景，第二、三张更贴近真实使用路径。
+
 <p align="center">
-  <img src="assets/architecture-velaris.svg" alt="Velaris Decision Intelligence Architecture" width="900">
+  <a href="docs/diagrams/velaris-architecture.svg">
+    <img src="docs/diagrams/velaris-architecture.png" alt="Velaris Decision Intelligence Architecture Overview" width="900">
+  </a>
 </p>
 
+<p align="center"><strong>1. 核心运行时总览</strong>：Agent Loop / Decision Tools / Learning Loop / Data Sources。</p>
+
+<p align="center">
+  <a href="docs/diagrams/velaris-agent-hotel-biztravel-architecture.svg">
+    <img src="docs/diagrams/velaris-agent-hotel-biztravel-architecture.png" alt="Velaris hotel and biztravel target architecture" width="900">
+  </a>
+</p>
+
+<p align="center"><strong>2. 酒店 / 商旅目标态</strong>：共享决策内核、候选标准化、bundle 规划、解释与治理。</p>
+
+<p align="center">
+  <a href="docs/diagrams/velaris-agent-hotel-biztravel-sequence.svg">
+    <img src="docs/diagrams/velaris-agent-hotel-biztravel-sequence.png" alt="Velaris hotel and biztravel sequence" width="900">
+  </a>
+</p>
+
+<p align="center"><strong>3. 提案 / 确认时序</strong>：proposal → confirmation → audit / memory 回写。</p>
+
+<p align="center"><em>完整图集见 <code>docs/diagrams/index.html</code>；下方文字是架构层的展开说明。</em></p>
+
 ### 五层 + 学习闭环设计
+
+下面这组分层说明从治理与编排视角展开，和上面的图集是互补关系。
 
 ```
 L0  Agent Runtime        OpenHarness engine — LLM 推理 + 工具调用编排
