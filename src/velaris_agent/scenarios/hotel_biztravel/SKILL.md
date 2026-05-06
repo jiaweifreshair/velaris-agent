@@ -1,6 +1,15 @@
 ---
 name: hotel_biztravel
 version: "1.0"
+entry_point: "velaris_agent.biz.engine:_run_hotel_biztravel_scenario"
+fallback_scenario: travel
+match_priority: 100
+match_rules:
+  type: dual_signal
+  signal_groups:
+    - [鲜花, 花束, 花店, 咖啡, 咖啡店, 接送, 礼宾, 餐厅, 多店, 门店, 伴手礼, bundle, 组合方案, 联合决策, 行程套餐, 附加服务]
+    - [酒店, 商旅, 差旅, 出差, 机场, 送机, 接机, 候机, 航班, 行程, 旅程]
+  direct_signals: [hotel_biztravel, bundle_rank]
 keywords:
   - hotel_biztravel
   - 商旅礼宾

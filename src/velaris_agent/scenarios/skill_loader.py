@@ -62,6 +62,10 @@ class ScenarioSpec:
     risk_level: str = "medium"
     recommended_tools: tuple[str, ...] = ()
     description: str = ""
+    entry_point: str = ""
+    fallback_scenario: str = "general"
+    match_priority: int = 0
+    match_rules: dict[str, Any] = field(default_factory=dict)
 
 
 def load_skill_md(path: Path | str) -> ScenarioSpec:
@@ -137,6 +141,18 @@ def load_skill_md(path: Path | str) -> ScenarioSpec:
             description = line
             break
 
+    # 解析 entry_point（场景执行器模块路径，如 "velaris_agent.biz.engine:_run_travel_scenario"）
+    entry_point = str(raw.get("entry_point", "")).strip()
+
+    # 解析 fallback_scenario（场景匹配失败时的兜底场景名）
+    fallback_scenario = str(raw.get("fallback_scenario", "general")).strip()
+
+    # 解析 match_priority（匹配优先级，数值越高越优先）
+    match_priority = int(raw.get("match_priority", 0))
+
+    # 解析 match_rules（高级匹配规则，如双信号检测）
+    match_rules = dict(raw.get("match_rules", {}))
+
     version = str(raw.get("version", "1.0")).strip()
 
     return ScenarioSpec(
@@ -149,6 +165,10 @@ def load_skill_md(path: Path | str) -> ScenarioSpec:
         risk_level=risk_level,
         recommended_tools=recommended_tools,
         description=description,
+        entry_point=entry_point,
+        fallback_scenario=fallback_scenario,
+        match_priority=match_priority,
+        match_rules=match_rules,
     )
 
 

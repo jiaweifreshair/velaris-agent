@@ -60,6 +60,22 @@ def get_scenario_registry() -> ScenarioRegistry:
 _OPENCLAW_MIN_SAFETY = 0.9
 _OPENCLAW_MIN_COMPLIANCE = 0.9
 
+
+def _resolve_entry_point(entry_point: str) -> Any:
+    """解析 entry_point 字符串为可调用的场景执行器。
+
+    格式：'module.path:function_name'（与 setuptools entry_point 兼容）。
+    """
+    if ":" not in entry_point:
+        return None
+    module_path, func_name = entry_point.rsplit(":", 1)
+    try:
+        import importlib
+        module = importlib.import_module(module_path)
+        return getattr(module, func_name, None)
+    except (ImportError, AttributeError):
+        return None
+
 _TRAVEL_CITY_TOKENS: tuple[str, ...] = (
     "北京",
     "上海",
@@ -92,12 +108,7 @@ _TRAVEL_TEXT_ROUTE_PATTERN = re.compile(
 
 
 def infer_scenario(query: str, scenario: str | None = None) -> str:
-    """识别业务场景（通过 ScenarioRegistry）。"""
-    # hotel_biztravel 特殊逻辑：需要在 registry 关键词匹配之前检测
-    lowered = query.lower()
-    if _looks_like_hotel_biztravel_query(lowered):
-        return "hotel_biztravel"
-
+    """识别业务场景（通过 ScenarioRegistry，含高级匹配规则）。"""
     spec = _registry.match(query, scenario_hint=scenario)
     return spec.name if spec else "general"
 
@@ -233,20 +244,40 @@ def score_options(options: list[dict[str, Any]], weights: dict[str, float]) -> l
 
 
 def run_scenario(scenario: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """运行一个业务场景。"""
-    if scenario == "lifegoal":
-        return _run_lifegoal_scenario(payload)
-    if scenario == "travel":
-        return _run_travel_scenario(payload)
-    if scenario == "hotel_biztravel":
-        return _run_hotel_biztravel_scenario(payload)
-    if scenario == "tokencost":
-        return _run_tokencost_scenario(payload)
-    if scenario == "robotclaw":
-        return _run_robotclaw_scenario(payload)
-    if scenario == "procurement":
-        return _run_procurement_scenario(payload)
-    raise ValueError(f"Unsupported biz scenario: {scenario}")
+    """运行一个业务场景。
+
+    优先从 ScenarioRegistry 的 entry_point 动态加载执行器；
+    找不到 entry_point 时回退到本地硬编码映射（向后兼容）；
+    场景不存在时走 general 兜底。
+    """
+    # 1. 尝试从 ScenarioRegistry 的 entry_point 动态加载
+    entry_point = _registry.get_entry_point(scenario)
+    if entry_point:
+        runner = _resolve_entry_point(entry_point)
+        if runner is not None:
+            return runner(payload)
+
+    # 2. 回退：本地硬编码映射（向后兼容，渐进迁移）
+    _HARDCODED_RUNNERS: dict[str, Any] = {
+        "lifegoal": _run_lifegoal_scenario,
+        "travel": _run_travel_scenario,
+        "hotel_biztravel": _run_hotel_biztravel_scenario,
+        "tokencost": _run_tokencost_scenario,
+        "robotclaw": _run_robotclaw_scenario,
+        "procurement": _run_procurement_scenario,
+        "general": _run_general_scenario,
+    }
+    runner = _HARDCODED_RUNNERS.get(scenario)
+    if runner is not None:
+        return runner(payload)
+
+    # 3. 兜底：场景未注册时走 general
+    fallback = _registry.get_fallback_scenario(scenario)
+    if fallback and fallback != scenario:
+        return run_scenario(fallback, payload)
+
+    # 4. 最终兜底
+    return _run_general_scenario(payload)
 
 
 def _run_travel_scenario(payload: dict[str, Any]) -> dict[str, Any]:
@@ -814,6 +845,57 @@ def _collect_procurement_graph_evidence_refs(
     if isinstance(raw_option, dict):
         evidence_refs.extend(str(item) for item in raw_option.get("evidence_refs", []))
     return list(dict.fromkeys(evidence_refs))
+
+
+def _run_general_scenario(payload: dict[str, Any]) -> dict[str, Any]:
+    """通用兜底场景：当无法匹配具体场景时提供基础评分和推荐。
+
+    设计原则：
+    - 零假设：不假设输入结构，兼容任意 payload
+    - 安全降级：缺少字段时用合理默认值
+    - 最小可用：提供排序和推荐，让前端至少有东西可展示
+    """
+    query = str(payload.get("query", "") or "")
+    raw_options = payload.get("options", [])
+    weights = dict(_registry.get_weights("general"))
+
+    if not raw_options:
+        return {
+            "scenario": "general",
+            "query": query,
+            "recommended": None,
+            "alternatives": [],
+            "summary": "当前无候选选项，请提供更多选项或约束。",
+            "requires_confirmation": False,
+        }
+
+    # 通用多维评分：尝试从候选项中提取 scores 子字典
+    scored_input: list[dict[str, Any]] = []
+    for opt in raw_options:
+        dims = opt.get("scores", opt.get("dimensions", {}))
+        if not dims and isinstance(opt, dict):
+            # 尝试从顶层数值字段推断
+            dims = {}
+            for key in ("quality", "cost", "speed", "price", "time", "comfort"):
+                if key in opt:
+                    dims[key] = _clamp_score(float(opt[key]))
+        scored_input.append({
+            "id": opt.get("id", ""),
+            "label": opt.get("label", opt.get("id", "")),
+            "scores": {k: _clamp_score(float(v)) for k, v in dims.items()},
+        })
+
+    ranked = score_options(scored_input, weights)
+    recommended = ranked[0] if ranked else None
+    return {
+        "scenario": "general",
+        "query": query,
+        "recommended": recommended,
+        "alternatives": ranked[1:3] if len(ranked) > 1 else [],
+        "all_ranked": ranked,
+        "summary": f"通用场景分析了 {len(ranked)} 个选项。",
+        "requires_confirmation": bool(ranked),
+    }
 
 
 def _run_lifegoal_scenario(payload: dict[str, Any]) -> dict[str, Any]:

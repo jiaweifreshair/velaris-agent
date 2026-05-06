@@ -1,6 +1,8 @@
 ---
 name: lifegoal
 version: "1.0"
+entry_point: "velaris_agent.biz.engine:_run_lifegoal_scenario"
+fallback_scenario: general
 keywords:
   - lifegoal
   - career

@@ -81,15 +81,26 @@ class ScenarioRegistry:
 
         匹配优先级：
         1. scenario_hint 精确匹配场景名
-        2. 关键词最长匹配（优先匹配更具体的关键词）
-        3. None（无匹配）
+        2. 高级匹配规则（match_rules，如 dual_signal 双信号检测）
+        3. 关键词最长匹配（优先匹配更具体的关键词）
+        4. None（无匹配）
         """
         # 优先级 1：显式指定
         if scenario_hint and scenario_hint in self._state.specs:
             return self._state.specs[scenario_hint]
 
-        # 优先级 2：关键词匹配（最长匹配优先）
+        # 优先级 2：高级匹配规则（按 match_priority 降序）
         lowered = query.lower()
+        specs_by_priority = sorted(
+            [s for s in self._state.specs.values() if s.match_rules],
+            key=lambda s: s.match_priority,
+            reverse=True,
+        )
+        for spec in specs_by_priority:
+            if self._check_match_rules(spec, lowered):
+                return spec
+
+        # 优先级 3：关键词匹配（最长匹配优先）
         best_match: str | None = None
         best_len = 0
         for keyword, scenario_name in self._state.keyword_index.items():
@@ -100,6 +111,45 @@ class ScenarioRegistry:
         if best_match and best_match in self._state.specs:
             return self._state.specs[best_match]
         return None
+
+    def _check_match_rules(self, spec: ScenarioSpec, lowered_query: str) -> bool:
+        """检查高级匹配规则。
+
+        支持的规则类型：
+        - dual_signal: 双信号检测，需要两组关键词同时命中
+        """
+        rules = spec.match_rules
+        if not rules:
+            return False
+
+        rule_type = rules.get("type", "")
+
+        if rule_type == "dual_signal":
+            return self._check_dual_signal(spec, lowered_query, rules)
+
+        return False
+
+    def _check_dual_signal(
+        self, spec: ScenarioSpec, lowered_query: str, rules: dict[str, Any],
+    ) -> bool:
+        """双信号检测：需要信号组中的关键词同时命中才匹配。"""
+        # 直接信号：查询中包含特定字符串直接命中
+        direct_signals = rules.get("direct_signals", [])
+        for signal in direct_signals:
+            if signal.lower() in lowered_query:
+                return True
+
+        # 双信号组：需要两组信号同时命中
+        signal_groups = rules.get("signal_groups", [])
+        if len(signal_groups) < 2:
+            return False
+
+        group_a = [s.lower() for s in signal_groups[0]]
+        group_b = [s.lower() for s in signal_groups[1]]
+
+        hit_a = any(s in lowered_query for s in group_a)
+        hit_b = any(s in lowered_query for s in group_b)
+        return hit_a and hit_b
 
     def get(self, name: str) -> ScenarioSpec | None:
         """按名称获取场景规格，不存在返回 None。"""
@@ -162,6 +212,16 @@ class ScenarioRegistry:
         """获取场景风险等级，不存在返回 'medium'。"""
         spec = self.get(name)
         return spec.risk_level if spec else "medium"
+
+    def get_entry_point(self, name: str) -> str:
+        """获取场景执行器入口点，不存在返回空字符串。"""
+        spec = self.get(name)
+        return spec.entry_point if spec else ""
+
+    def get_fallback_scenario(self, name: str) -> str:
+        """获取场景兜底场景名，不存在返回 'general'。"""
+        spec = self.get(name)
+        return spec.fallback_scenario if spec else "general"
 
     # ── 私有方法 ──────────────────────────────────────────────
 
