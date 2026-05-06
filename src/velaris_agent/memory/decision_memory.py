@@ -76,11 +76,12 @@ class DecisionMemory:
           dec-xxxx.json      # 完整决策记录
     """
 
-    def __init__(self, base_dir: str | Path | None = None) -> None:
+    def __init__(self, base_dir: str | Path | None = None, semantic_engine: Any | None = None) -> None:
         """初始化决策记忆。
 
         Args:
             base_dir: 存储目录, 默认 ~/.velaris/decisions/
+            semantic_engine: 语义召回引擎（可选增强，None 时仅用 keyword）
         """
         if base_dir is None:
             base_dir = Path.home() / ".velaris" / "decisions"
@@ -89,6 +90,8 @@ class DecisionMemory:
         self._index_path = self._base_dir / "index.jsonl"
         self._base_dir.mkdir(parents=True, exist_ok=True)
         self._records_dir.mkdir(parents=True, exist_ok=True)
+        # 语义召回引擎（可选增强）
+        self._semantic_engine = semantic_engine
 
     def save(self, record: DecisionRecord) -> str:
         """保存决策记录, 返回 decision_id。"""
@@ -107,6 +110,13 @@ class DecisionMemory:
         ]
         index_entries.append(build_decision_index_entry(record))
         self._write_index_entries(index_entries)
+
+        # 语义召回引擎索引（可选增强）
+        if self._semantic_engine is not None:
+            try:
+                self._semantic_engine.index(record)
+            except Exception:
+                pass  # 语义索引失败不影响主流程
 
         return record.decision_id
 
@@ -189,11 +199,53 @@ class DecisionMemory:
     ) -> list[DecisionRecord]:
         """找到相似的历史决策。
 
-        当前实现: 轻量关键词匹配。
-        相比简单的 `split()`，这里会先清洗中英文标点，
-        让中文问题在没有空格分词时也能得到基本可用的召回效果。
-        未来可升级为 embedding 语义搜索。
+        优先使用语义召回（如果配置了 semantic_engine），
+        不足时 fallback 到轻量关键词匹配。
         """
+        # 语义召回优先路径
+        if self._semantic_engine is not None:
+            try:
+                from velaris_agent.memory.semantic_recall import HybridRecallEngine
+                # 如果已经是 HybridRecallEngine，直接用
+                if isinstance(self._semantic_engine, HybridRecallEngine):
+                    results = self._semantic_engine.recall(
+                        query=query, scenario=scenario, user_id=user_id, top_k=limit,
+                    )
+                else:
+                    # 语义引擎（非 Hybrid）直接召回
+                    results = self._semantic_engine.recall(
+                        query=query, scenario=scenario, user_id=user_id, top_k=limit,
+                    )
+
+                # 如果语义召回足够，直接返回
+                if len(results) >= limit:
+                    return [r.record for r in results[:limit]]
+
+                # 不足时用 keyword 补充
+                if results:
+                    semantic_ids = {r.record.decision_id for r in results}
+                    keyword_records = self._keyword_recall(user_id, scenario, query, limit=limit - len(results))
+                    # 去重合并
+                    for kr in keyword_records:
+                        if kr.decision_id not in semantic_ids:
+                            results.append(type(results[0])(record=kr, score=0.0, method="keyword_fallback") if hasattr(results[0], 'method') else results[0])
+                    return [r.record for r in results[:limit]]
+
+                # 语义召回为空，完全 fallback 到 keyword
+            except Exception:
+                pass  # 语义召回失败，fallback 到 keyword
+
+        # Keyword fallback 路径
+        return self._keyword_recall(user_id, scenario, query, limit=limit)
+
+    def _keyword_recall(
+        self,
+        user_id: str,
+        scenario: str,
+        query: str,
+        limit: int = 5,
+    ) -> list[DecisionRecord]:
+        """轻量关键词匹配召回（原有逻辑）。"""
         query_words = self._tokenize_query(query)
         candidates: list[tuple[int, DecisionRecord]] = []
 
