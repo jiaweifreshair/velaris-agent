@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from velaris_agent.biz.engine import _SCENARIO_WEIGHTS, build_capability_plan
+from velaris_agent.biz.engine import build_capability_plan, get_scenario_registry
 from velaris_agent.memory.conflict_engine import ConflictDetectionEngine
 from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.memory.negotiation import NegotiationStrategy
@@ -1842,7 +1842,8 @@ class TestProperty21HardConstraintNonNegotiability:
 # Shared strategies for engine integration property tests
 # ---------------------------------------------------------------------------
 
-# Scenario keywords that map to known _SCENARIO_WEIGHTS entries
+# Scenario keywords that map to known registry weight entries
+_REGISTRY = get_scenario_registry()
 _ENGINE_SCENARIOS = ["lifegoal", "travel", "tokencost", "robotclaw"]
 
 
@@ -1858,7 +1859,7 @@ def st_stakeholder_map_with_overlapping_weights(
     Returns (query_keyword, stakeholder_map, original_decision_weights).
     """
     scenario = draw(st.sampled_from(_ENGINE_SCENARIOS))
-    original_weights = dict(_SCENARIO_WEIGHTS[scenario])
+    original_weights = dict(_REGISTRY.get_weights(scenario))
 
     # Pick at least one dimension from the scenario weights
     dims = list(original_weights.keys())

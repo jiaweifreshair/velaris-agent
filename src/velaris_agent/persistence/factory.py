@@ -1,21 +1,26 @@
 """Velaris 持久化对象工厂。
 
-本仓库已收束为 SQLite 单库主线，因此该模块只负责：
-- 解析 `sqlite_database_path` / `cwd` 推导出的项目内数据库位置；
+本仓库支持 SQLite 和 OpenViking 双后端：
+- SQLite：传统关系型存储，适合单用户 CLI 和渐进迁移
+- OpenViking：AI Agent 原生上下文数据库，支持 viking:// URI + 三层加载
+
+工厂职责：
+- 解析 `sqlite_database_path` / `openviking_path` / `cwd` 推导存储位置；
 - 幂等初始化 schema（避免调用方必须先手动执行 `velaris storage init` 才能使用）；
-- 构建 SQLite 仓储实现，并在缺省场景下回退到内存/文件后端以保持兼容。
+- 按 OpenViking 优先原则构建仓储实现，SQLite 作为回退和兼容层。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from velaris_agent.memory.decision_memory import DecisionMemory
 from velaris_agent.velaris.outcome_store import OutcomeStore
 from velaris_agent.velaris.task_ledger import TaskLedger
 
 if TYPE_CHECKING:
+    from velaris_agent.context.openviking_context import OpenVikingContext
     from velaris_agent.persistence.job_queue import SqliteJobQueue
     from velaris_agent.persistence.sqlite_execution import (
         ExecutionRepository as SqliteExecutionRepository,
@@ -170,5 +175,72 @@ def build_job_queue(
         from velaris_agent.persistence.job_queue import SqliteJobQueue
 
         return SqliteJobQueue(resolved_sqlite_path)
+    return None
+
+
+# ── OpenViking 工厂方法 ──────────────────────────────────────────────
+
+
+_BOOTSTRAPPED_VIKING_PATHS: set[str] = set()
+
+
+def _resolve_openviking_path(
+    openviking_path: str | Path | None,
+    cwd: str | Path | None,
+) -> str | None:
+    """解析 OpenViking 数据路径。
+
+    优先级：
+    1) 显式 openviking_path
+    2) 从 cwd 推导项目内默认路径 (.velaris/viking/)
+    """
+    if openviking_path is not None and str(openviking_path).strip():
+        return str(Path(openviking_path))
+    if cwd is not None and str(cwd).strip():
+        return str(Path(cwd).resolve() / ".velaris" / "viking")
+    return None
+
+
+def build_openviking_context(
+    openviking_path: str | Path | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    agent_id: str = "velaris-default",
+    cwd: str | Path | None = None,
+) -> "OpenVikingContext | None":
+    """按配置构建 OpenViking 上下文管理器。
+
+    构建逻辑：
+    - 若有 openviking_path 或 cwd：构建本地模式 OpenVikingContext
+    - 若有 base_url：构建 HTTP 模式 OpenVikingContext
+    - 否则：返回 None（回退到 SQLite/文件后端）
+
+    Args:
+        openviking_path: 本地 OpenViking 数据目录
+        base_url: 远程 OpenViking 服务地址
+        api_key: 远程服务的 API 密钥
+        agent_id: Agent 标识
+        cwd: 工作目录（用于推导默认路径）
+
+    Returns:
+        OpenVikingContext 实例，无法构建时返回 None
+    """
+    from velaris_agent.context.openviking_context import OpenVikingContext
+
+    resolved_local = _resolve_openviking_path(openviking_path, cwd)
+
+    if resolved_local is not None:
+        return OpenVikingContext(
+            local_path=resolved_local,
+            agent_id=agent_id,
+        )
+
+    if base_url is not None and base_url.strip():
+        return OpenVikingContext(
+            base_url=base_url,
+            api_key=api_key,
+            agent_id=agent_id,
+        )
+
     return None
 

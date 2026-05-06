@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from velaris_agent.scenarios.registry import ScenarioRegistry
+
 
 @dataclass(frozen=True)
 class SelectedRoute:
@@ -41,9 +43,10 @@ class RoutingDecision:
 class PolicyRouter:
     """Velaris 原生策略路由器。"""
 
-    def __init__(self, policy_path: str | Path | None = None) -> None:
+    def __init__(self, policy_path: str | Path | None = None, scenario_registry: ScenarioRegistry | None = None) -> None:
         self.policy_path = Path(policy_path).resolve() if policy_path is not None else self._resolve_default_policy_path()
         self.policy = self._load_policy(self.policy_path)
+        self._registry = scenario_registry or ScenarioRegistry()
 
     def route(self, plan: dict[str, Any], query: str) -> RoutingDecision:
         routing_context = self._build_routing_context(plan=plan, query=query)
@@ -122,11 +125,13 @@ class PolicyRouter:
         capabilities = set(plan.get("capabilities", []))
 
         write_code = self._constraint_bool(constraints, "write_code", ("capability_demand", "writeCode"), default=False)
+        # 默认外部副作用：高风险场景（如 robotclaw/procurement）需要审计
+        _default_external_side_effects = self._registry.get_risk_level(scenario) == "high"
         external_side_effects = self._constraint_bool(
             constraints,
             "external_side_effects",
             ("capability_demand", "externalSideEffects"),
-            default=scenario == "robotclaw",
+            default=_default_external_side_effects,
         )
         requires_audit = self._constraint_bool(
             constraints,
@@ -196,9 +201,12 @@ class PolicyRouter:
     def _infer_task_complexity(self, scenario: str, write_code: bool, external_side_effects: bool, capability_count: int) -> str:
         if write_code or external_side_effects:
             return "complex"
-        if capability_count >= 4 and scenario == "robotclaw":
+        # 使用 registry 查询 risk_level 替代硬编码场景判断
+        spec = self._registry.get(scenario)
+        risk_level = spec.risk_level if spec else "medium"
+        if capability_count >= 4 and risk_level == "high":
             return "complex"
-        if scenario in {"travel", "tokencost"}:
+        if risk_level == "low":
             return "simple"
         return "medium"
 
@@ -207,13 +215,8 @@ class PolicyRouter:
             return "high"
         if external_side_effects:
             return "medium"
-        if scenario == "tokencost":
-            return "low"
-        if scenario == "travel":
-            return "medium"
-        if scenario == "robotclaw":
-            return "high"
-        return "medium"
+        # 使用 registry 查询 risk_level 替代硬编码场景名判断
+        return self._registry.get_risk_level(scenario)
 
     def _matches(self, condition: dict[str, Any], context: dict[str, Any]) -> bool:
         if "all" in condition:

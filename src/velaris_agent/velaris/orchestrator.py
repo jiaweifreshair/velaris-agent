@@ -12,6 +12,7 @@ from velaris_agent.memory.types import StakeholderMapModel
 from velaris_agent.persistence.factory import (
     build_audit_store,
     build_execution_repository,
+    build_openviking_context,
     build_outcome_store,
     build_session_repository,
     build_task_ledger,
@@ -65,6 +66,7 @@ class VelarisBizOrchestrator:
         execution_repository: Any | None = None,
         persistence_barrier: PreExecutionPersistenceBarrier | None = None,
         failure_classifier: PersistenceFailureClassifier | None = None,
+        openviking_context: Any | None = None,
         cwd: str | Path | None = None,
         sqlite_database_path: str | Path | None = None,
     ) -> None:
@@ -106,6 +108,8 @@ class VelarisBizOrchestrator:
                 audit_store=self.audit_store,
                 failure_classifier=self.failure_classifier,
             )
+        # OpenViking 上下文管理器（可选增强，不影响现有 SQLite 主线）
+        self.openviking_context = openviking_context
 
     def execute_request(self, request: DecisionExecutionRequest) -> dict[str, Any]:
         """标准化 request 入口：OpenHarness 只负责提交请求并接收统一执行包络。"""
@@ -275,6 +279,20 @@ class VelarisBizOrchestrator:
                 raise RuntimeError(failure_payload) from exc
             execution = barrier_result.execution_record
             audit_event_count += barrier_result.audit_event_count
+
+        # OpenViking 增强快照持久化（可选，不影响 SQLite 主线）
+        self._persist_snapshot_to_viking(
+            execution_id=execution.execution_id,
+            snapshot={
+                "plan": plan,
+                "routing": routing.to_dict(),
+                "authority": authority.to_dict(),
+                "gate_decision": gate_decision.to_dict(),
+                "session_id": resolved_session_id,
+                "cwd": str(self.cwd),
+                "query": query,
+            },
+        )
 
         task = self.task_ledger.create_task(
             session_id=resolved_session_id,
@@ -702,6 +720,39 @@ class VelarisBizOrchestrator:
                 ) from exc
             return 0
         return 1
+
+    def _persist_snapshot_to_viking(
+        self,
+        execution_id: str,
+        snapshot: dict[str, Any],
+    ) -> str | None:
+        """将执行快照持久化到 OpenViking（可选增强）。
+
+        此方法不会影响主流程——即使 OpenViking 未配置或写入失败，
+        也不会抛出异常或改变执行语义。返回 viking:// URI 或 None。
+
+        Args:
+            execution_id: 执行 ID
+            snapshot: 快照数据
+
+        Returns:
+            viking:// URI 字符串，未配置时返回 None
+        """
+        if self.openviking_context is None:
+            return None
+
+        try:
+            return self.openviking_context.save_snapshot(
+                execution_id=execution_id,
+                snapshot=snapshot,
+            )
+        except Exception as exc:
+            # OpenViking 是增强能力，不能反向污染主业务
+            import logging
+            logging.getLogger(__name__).warning(
+                f"OpenViking 快照持久化失败 (execution_id={execution_id}): {exc}"
+            )
+            return None
 
 
 def _resolve_stakeholder_map(

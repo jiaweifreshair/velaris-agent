@@ -1,9 +1,9 @@
 """Velaris 原生业务能力引擎。
 
 实现三类共享能力：
-1. 业务场景识别与能力规划。
+1. 业务场景识别与能力规划（通过 ScenarioRegistry 插件化）。
 2. 多维评分与排序。
-3. travel / tokencost / robotclaw 三类场景执行。
+3. travel / tokencost / robotclaw / procurement / lifegoal / hotel_biztravel 场景执行。
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ from velaris_agent.scenarios.procurement.types import (
     ProcurementOption,
     ProcurementWorkflowStatus,
 )
+from velaris_agent.scenarios.registry import ScenarioRegistry
 from velaris_agent.scenarios.travel_protocol import (
     TravelAuditTrace,
     TravelCompareResult,
@@ -47,109 +48,14 @@ from velaris_agent.scenarios.travel_protocol import (
 )
 
 
-_SCENARIO_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "lifegoal": (
-        "lifegoal", "career", "job", "offer", "跳槽", "转行", "创业", "升学",
-        "投资", "买房", "理财", "保险", "健康", "运动", "留学", "考证",
-        "人生", "决策", "选择", "纠结", "该不该", "怎么选",
-    ),
-    "travel": ("travel", "flight", "hotel", "trip", "商旅", "出差", "机票", "酒店"),
-    "hotel_biztravel": ("hotel_biztravel", "商旅礼宾", "酒店礼宾", "联合决策", "bundle"),
-    "tokencost": ("tokencost", "token", "openai", "anthropic", "模型成本", "降本", "api 花费", "成本优化"),
-    "robotclaw": ("robotclaw", "dispatch", "robotaxi", "vehicle", "proposal", "派单", "运力", "合约", "车端"),
-    "procurement": (
-        "procurement", "supplier", "vendor", "rfq", "rfp", "采购", "供应商",
-        "比价", "询价", "招标", "审计", "合规", "合同", "履约",
-    ),
-}
+# ── ScenarioRegistry：SKILL.md 驱动的场景注册表 ───────────────
+# 全局单例，替代原有 _SCENARIO_* 硬编码字典
+_registry = ScenarioRegistry()
 
-_SCENARIO_CAPABILITIES: dict[str, list[str]] = {
-    "lifegoal": ["intent_parse", "option_discovery", "multi_dim_score", "recommendation", "memory_recall"],
-    "travel": ["intent_parse", "inventory_search", "option_score", "itinerary_recommend"],
-    "hotel_biztravel": [
-        "intent_parse",
-        "candidate_normalize",
-        "bundle_planning",
-        "feasibility_filter",
-        "joint_ranking",
-        "need_inference",
-        "preference_writeback",
-        "decision_explanation",
-        "memory_recall",
-    ],
-    "tokencost": ["usage_analyze", "model_compare", "saving_estimate", "optimization_recommend"],
-    "robotclaw": ["intent_order", "vehicle_match", "proposal_score", "contract_form"],
-    "procurement": ["intent_parse", "supplier_compare", "compliance_review", "multi_dim_score", "recommendation"],
-}
 
-_SCENARIO_WEIGHTS: dict[str, dict[str, float]] = {
-    "lifegoal": {"growth": 0.25, "income": 0.25, "fulfillment": 0.20, "stability": 0.15, "balance": 0.15},
-    "travel": {"price": 0.4, "time": 0.35, "comfort": 0.25},
-    "hotel_biztravel": {
-        "price": 0.20,
-        "eta": 0.30,
-        "detour_cost": 0.20,
-        "preference_match": 0.20,
-        "experience_value": 0.10,
-    },
-    "tokencost": {"cost": 0.5, "quality": 0.35, "speed": 0.15},
-    "robotclaw": {"safety": 0.4, "eta": 0.25, "cost": 0.2, "compliance": 0.15},
-    "procurement": {"cost": 0.28, "quality": 0.24, "delivery": 0.16, "compliance": 0.22, "risk": 0.10},
-}
-
-_SCENARIO_GOVERNANCE: dict[str, dict[str, Any]] = {
-    "lifegoal": {
-        "requires_audit": False,
-        "approval_mode": "default",
-        "stop_profile": "balanced",
-    },
-    "travel": {
-        "requires_audit": False,
-        "approval_mode": "default",
-        "stop_profile": "balanced",
-    },
-    "hotel_biztravel": {
-        "requires_audit": False,
-        "approval_mode": "default",
-        "stop_profile": "balanced",
-    },
-    "tokencost": {
-        "requires_audit": False,
-        "approval_mode": "default",
-        "stop_profile": "balanced",
-    },
-    "robotclaw": {
-        "requires_audit": True,
-        "approval_mode": "strict",
-        "stop_profile": "strict_approval",
-    },
-    "procurement": {
-        "requires_audit": True,
-        "approval_mode": "strict",
-        "stop_profile": "strict_approval",
-    },
-}
-
-_SCENARIO_RECOMMENDED_TOOLS: dict[str, list[str]] = {
-    "lifegoal": [
-        "lifegoal_decide", "recall_preferences", "recall_decisions",
-        "save_decision", "decision_score", "biz_execute",
-    ],
-    "travel": ["biz_execute", "travel_recommend", "travel_compare", "biz_plan", "biz_score"],
-    "hotel_biztravel": [
-        "recall_preferences",
-        "recall_decisions",
-        "biz_execute",
-        "decision_score",
-        "save_decision",
-        "biz_plan",
-        "biz_score",
-    ],
-    "tokencost": ["biz_execute", "tokencost_analyze", "biz_plan", "biz_score"],
-    "robotclaw": ["biz_execute", "robotclaw_dispatch", "biz_plan", "biz_score"],
-    "procurement": ["biz_execute", "biz_run_scenario", "biz_plan", "biz_score"],
-    "general": ["biz_execute", "biz_plan", "biz_score", "biz_run_scenario"],
-}
+def get_scenario_registry() -> ScenarioRegistry:
+    """获取全局 ScenarioRegistry 实例。"""
+    return _registry
 
 _OPENCLAW_MIN_SAFETY = 0.9
 _OPENCLAW_MIN_COMPLIANCE = 0.9
@@ -186,17 +92,14 @@ _TRAVEL_TEXT_ROUTE_PATTERN = re.compile(
 
 
 def infer_scenario(query: str, scenario: str | None = None) -> str:
-    """识别业务场景。"""
-    if scenario in _SCENARIO_CAPABILITIES:
-        return scenario
-
+    """识别业务场景（通过 ScenarioRegistry）。"""
+    # hotel_biztravel 特殊逻辑：需要在 registry 关键词匹配之前检测
     lowered = query.lower()
     if _looks_like_hotel_biztravel_query(lowered):
         return "hotel_biztravel"
-    for candidate, keywords in _SCENARIO_KEYWORDS.items():
-        if any(keyword in lowered for keyword in keywords):
-            return candidate
-    return "general"
+
+    spec = _registry.match(query, scenario_hint=scenario)
+    return spec.name if spec else "general"
 
 
 def build_capability_plan(
@@ -208,21 +111,12 @@ def build_capability_plan(
     """生成业务能力规划。"""
     normalized_constraints = constraints or {}
     resolved_scenario = infer_scenario(query, scenario)
-    capabilities = _SCENARIO_CAPABILITIES.get(resolved_scenario, ["generic_analysis", "option_score"])
-    governance = dict(
-        _SCENARIO_GOVERNANCE.get(
-            resolved_scenario,
-            {
-                "requires_audit": False,
-                "approval_mode": "default",
-                "stop_profile": "balanced",
-            },
-        )
-    )
+    capabilities = list(_registry.get_capabilities(resolved_scenario))
+    governance = _registry.get_governance(resolved_scenario)
     if "requires_audit" in normalized_constraints:
         governance["requires_audit"] = bool(normalized_constraints["requires_audit"])
 
-    decision_weights = dict(_SCENARIO_WEIGHTS.get(resolved_scenario, {"quality": 0.5, "cost": 0.3, "speed": 0.2}))
+    decision_weights = dict(_registry.get_weights(resolved_scenario))
 
     plan: dict[str, Any] = {
         "scenario": resolved_scenario,
@@ -231,10 +125,7 @@ def build_capability_plan(
         "capabilities": capabilities,
         "decision_weights": decision_weights,
         "governance": governance,
-        "recommended_tools": _SCENARIO_RECOMMENDED_TOOLS.get(
-            resolved_scenario,
-            _SCENARIO_RECOMMENDED_TOOLS["general"],
-        ),
+        "recommended_tools": list(_registry.get_recommended_tools(resolved_scenario)),
     }
 
     if stakeholder_map is not None:
@@ -458,7 +349,7 @@ def _run_travel_scenario(payload: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    ranked = score_options(scored_input, _SCENARIO_WEIGHTS["travel"])
+    ranked = score_options(scored_input, _registry.get_weights("travel"))
     cheapest = min(display_options, key=lambda option: float(option.get("price", 0)))
     ranked_map = {item["id"]: item for item in ranked}
     normalized_options = [
@@ -657,7 +548,7 @@ def _run_tokencost_scenario(payload: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    recommendations = score_options(scored_input, _SCENARIO_WEIGHTS["tokencost"])
+    recommendations = score_options(scored_input, _registry.get_weights("tokencost"))
     total_estimated_saving = round(sum(savings), 2)
     projected_monthly_cost = round(max(0.0, current_monthly_cost - total_estimated_saving), 2)
     return {
@@ -711,7 +602,7 @@ def _run_robotclaw_scenario(payload: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    ranked = score_options(scored_input, _SCENARIO_WEIGHTS["robotclaw"])
+    ranked = score_options(scored_input, _registry.get_weights("robotclaw"))
     top_id = ranked[0]["id"]
     top_source = next(item for item in ranked_candidates if item.get("id", "") == top_id)
     return {
@@ -942,7 +833,7 @@ def _run_lifegoal_scenario(payload: dict[str, Any]) -> dict[str, Any]:
         }
 
     # 获取领域权重
-    weights = dict(_SCENARIO_WEIGHTS.get("lifegoal", {"quality": 0.5, "cost": 0.3, "risk": 0.2}))
+    weights = dict(_registry.get_weights("lifegoal"))
 
     # 风险偏好调整
     if risk_tolerance == "conservative":
