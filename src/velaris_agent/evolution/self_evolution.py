@@ -83,19 +83,30 @@ def run_self_evolution_review_job(
 
 
 class SelfEvolutionEngine:
-    """对历史决策进行回顾并生成优化建议。"""
+    """对历史决策进行回顾并生成优化建议。
+
+    v2.0 增强：集成 DecisionCostTracker，在自进化评估中增加成本维度。
+    """
 
     def __init__(
         self,
         memory: DecisionMemory,
         *,
         report_dir: str | Path | None = None,
+        cost_tracker: Any | None = None,
     ) -> None:
-        """初始化自进化引擎。"""
+        """初始化自进化引擎。
+
+        Args:
+            memory: 决策记忆存储
+            report_dir: 报告持久化目录
+            cost_tracker: DecisionCostTracker（可选，增加成本维度建议）
+        """
         self._memory = memory
         if report_dir is None:
             report_dir = Path.home() / ".velaris" / "evolution" / "reports"
         self._report_dir = Path(report_dir)
+        self._cost_tracker = cost_tracker
 
     def review(
         self,
@@ -262,6 +273,10 @@ class SelfEvolutionEngine:
                 )
             )
 
+        # v2.0 增强：成本维度建议
+        cost_actions = self._build_cost_actions(scenario=scenario)
+        actions.extend(cost_actions)
+
         if not actions:
             actions.append(
                 EvolutionAction(
@@ -272,6 +287,62 @@ class SelfEvolutionEngine:
                     details={},
                 )
             )
+        return actions
+
+    def _build_cost_actions(self, *, scenario: str) -> list[EvolutionAction]:
+        """从 DecisionCostTracker 生成成本维度的行动建议。"""
+        if self._cost_tracker is None:
+            return []
+
+        actions: list[EvolutionAction] = []
+        roi = self._cost_tracker.roi(scenario=scenario)
+
+        if roi.total_executions == 0:
+            return actions
+
+        # 成本效率低 → 建议优化
+        if roi.cost_efficiency < 500.0:
+            actions.append(
+                EvolutionAction(
+                    action_id="improve_cost_efficiency",
+                    priority="medium",
+                    title="提高 Token 使用效率",
+                    reason=f"成本效率偏低({roi.cost_efficiency:.0f} output_tokens/cost_unit)，建议使用 L0/L1 上下文替代 L2。",
+                    details={
+                        "cost_efficiency": roi.cost_efficiency,
+                        "avg_token_per_execution": roi.avg_token_per_execution,
+                    },
+                )
+            )
+
+        # 延迟偏高 → 建议优化
+        if roi.avg_latency_ms > 3000.0:
+            actions.append(
+                EvolutionAction(
+                    action_id="reduce_latency",
+                    priority="medium",
+                    title="降低决策延迟",
+                    reason=f"平均延迟偏高({roi.avg_latency_ms:.0f}ms)，建议简化上下文或切换到更快的模型。",
+                    details={"avg_latency_ms": roi.avg_latency_ms},
+                )
+            )
+
+        # 预算使用率 → 建议
+        budget_status = self._cost_tracker.budget_status()
+        if budget_status.utilization > 0.8:
+            actions.append(
+                EvolutionAction(
+                    action_id="budget_warning",
+                    priority="high",
+                    title="Token 预算即将耗尽",
+                    reason=f"预算使用率已达 {budget_status.utilization:.0%}，建议立即启用经济模式或申请追加预算。",
+                    details={
+                        "utilization": budget_status.utilization,
+                        "remaining": budget_status.remaining,
+                    },
+                )
+            )
+
         return actions
 
     def _find_scores(
