@@ -1,115 +1,281 @@
-<svg viewBox="0 0 680 580" width="100%" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 680 720" width="100%" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Velaris Decision Intelligence Runtime — TokenCost Enhanced Architecture</title>
+  <desc>Five-layer architecture with multi-platform provider接入, Token Economics decision strategy, and TokenScope integration</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
       markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#BA7517"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#1D9E75"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
   </defs>
 
   <!-- Title -->
-  <text x="340" y="30" text-anchor="middle" dominant-baseline="central"
-    style="font-size: 16px; font-weight: 500; font-family: var(--font-sans);">Velaris Decision Intelligence Runtime</text>
-  <text x="340" y="50" text-anchor="middle" dominant-baseline="central"
-    style="font-size: 12px; font-family: var(--font-sans);">五层架构 + 学习闭环设计</text>
+  <text x="340" y="24" text-anchor="middle" dominant-baseline="central"
+    style="font-size: 15px; font-weight: 500; font-family: var(--font-sans);">Velaris Decision Intelligence Runtime</text>
+  <text x="340" y="44" text-anchor="middle" dominant-baseline="central"
+    style="font-size: 12px; font-family: var(--font-sans); color: #5F5E5A;">五层架构 + Token Economics + 多平台接入</text>
 
-  <!-- Learning Loop (background, spans all layers) -->
-  <rect x="40" y="70" width="600" height="480" rx="16" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="8,4" opacity="0.3"/>
+  <!-- ==================== LEFT: Provider 接入层 ==================== -->
+  <g transform="translate(40, 70)">
+    <rect x="0" y="0" width="120" height="200" rx="10" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5"/>
+    <text x="60" y="20" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-weight: 500; font-family: var(--font-sans); color: #444441;">Provider 接入</text>
 
-  <!-- L0: Agent Runtime -->
+    <!-- Claude -->
+    <rect x="10" y="34" width="100" height="28" rx="6" fill="#E6F1FB" stroke="#378ADD" stroke-width="0.5"/>
+    <text x="60" y="48" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #0C447C;">Claude Code</text>
+
+    <!-- Codex -->
+    <rect x="10" y="68" width="100" height="28" rx="6" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.5"/>
+    <text x="60" y="82" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #3C3489;">Codex (OpenAI)</text>
+
+    <!-- OpenClaw -->
+    <rect x="10" y="102" width="100" height="28" rx="6" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/>
+    <text x="60" y="116" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #27500A;">OpenClaw</text>
+
+    <!-- Hermes -->
+    <rect x="10" y="136" width="100" height="28" rx="6" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+    <text x="60" y="150" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #854F0B;">Hermes</text>
+
+    <!-- Gemini -->
+    <rect x="10" y="170" width="100" height="24" rx="6" fill="#FCEBEB" stroke="#E24B4A" stroke-width="0.5"/>
+    <text x="60" y="182" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 10px; font-family: var(--font-sans); color: #791F1F;">Gemini CLI</text>
+  </g>
+
+  <!-- Arrow from Providers to L0 -->
+  <line x1="160" y1="170" x2="180" y2="170" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Learning Loop background (spans L0-L4) -->
+  <rect x="180" y="70" width="420" height="340" rx="16" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.5" stroke-dasharray="6,3" opacity="0.15"/>
+
+  <!-- ==================== L0: Agent Runtime ==================== -->
   <g>
-    <rect x="100" y="90" width="480" height="56" rx="8" fill="#E6F1FB" stroke="#378ADD" stroke-width="0.5"/>
-    <text x="340" y="112" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 14px; font-weight: 500; font-family: var(--font-sans); color: #0C447C;">L0 · Agent Runtime</text>
-    <text x="340" y="132" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 13px; font-family: var(--font-sans); color: #5F5E5A;">OpenHarness engine — LLM 推理 + 工具调用编排</text>
+    <rect x="190" y="82" width="400" height="52" rx="8" fill="#E6F1FB" stroke="#378ADD" stroke-width="0.5"/>
+    <text x="390" y="100" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 13px; font-weight: 500; font-family: var(--font-sans); color: #0C447C;">L0 · Agent Runtime</text>
+    <text x="390" y="120" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #5F5E5A;">OpenHarness engine — 多 Provider LLM 推理 + 工具编排 + MCP 协议</text>
   </g>
 
   <!-- Arrow L0 → L1 -->
-  <line x1="340" y1="146" x2="340" y2="166" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="390" y1="134" x2="390" y2="152" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
 
-  <!-- L1: Goal-to-Plan -->
+  <!-- ==================== L1: Goal-to-Plan ==================== -->
   <g>
-    <rect x="100" y="166" width="480" height="56" rx="8" fill="#E1F5EE" stroke="#1D9E75" stroke-width="0.5"/>
-    <text x="340" y="188" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 14px; font-weight: 500; font-family: var(--font-sans); color: #085041;">L1 · Goal-to-Plan</text>
-    <text x="340" y="208" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 13px; font-family: var(--font-sans); color: #5F5E5A;">场景识别 (ScenarioRegistry) → 能力规划 → 治理约束</text>
+    <rect x="190" y="152" width="400" height="52" rx="8" fill="#E1F5EE" stroke="#1D9E75" stroke-width="0.5"/>
+    <text x="390" y="170" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 13px; font-weight: 500; font-family: var(--font-sans); color: #085041;">L1 · Goal-to-Plan</text>
+    <text x="390" y="190" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #5F5E5A;">ScenarioRegistry 插件化 → 能力规划 → 治理约束生成</text>
   </g>
 
   <!-- Arrow L1 → L2 -->
-  <line x1="340" y1="222" x2="340" y2="242" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="390" y1="204" x2="390" y2="222" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
 
-  <!-- L2: Routing & Governance -->
+  <!-- ==================== L2: Routing & Governance ==================== -->
   <g>
-    <rect x="100" y="242" width="480" height="56" rx="8" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.5"/>
-    <text x="340" y="264" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 14px; font-weight: 500; font-family: var(--font-sans); color: #3C3489;">L2 · Routing & Governance</text>
-    <text x="340" y="284" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 13px; font-family: var(--font-sans); color: #5F5E5A;">DynamicRouter 四层路由 → 能力签发 → 停止条件</text>
+    <rect x="190" y="222" width="400" height="52" rx="8" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.5"/>
+    <text x="390" y="240" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 13px; font-weight: 500; font-family: var(--font-sans); color: #3C3489;">L2 · Routing &amp; Governance</text>
+    <text x="390" y="260" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #5F5E5A;">DynamicRouter 四层路由 → 能力签发 → 成本感知 → 停止条件</text>
   </g>
 
   <!-- Arrow L2 → L3 -->
-  <line x1="340" y1="298" x2="340" y2="318" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="390" y1="274" x2="390" y2="292" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
 
-  <!-- L3: Decision Execution -->
+  <!-- ==================== L3: Decision Execution ==================== -->
   <g>
-    <rect x="100" y="318" width="480" height="56" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
-    <text x="340" y="340" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 14px; font-weight: 500; font-family: var(--font-sans); color: #854F0B;">L3 · Decision Execution</text>
-    <text x="340" y="360" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 13px; font-family: var(--font-sans); color: #5F5E5A;">多维评分 + 场景执行 + 数据自主抓取</text>
+    <rect x="190" y="292" width="400" height="52" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+    <text x="390" y="310" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 13px; font-weight: 500; font-family: var(--font-sans); color: #854F0B;">L3 · Decision Execution</text>
+    <text x="390" y="330" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-family: var(--font-sans); color: #5F5E5A;">多维评分 + 场景执行 + 数据自主抓取 + Token 审计追踪</text>
   </g>
 
   <!-- Arrow L3 → L4 -->
-  <line x1="340" y1="374" x2="340" y2="394" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="390" y1="344" x2="390" y2="362" stroke="#5F5E5A" stroke-width="1" marker-end="url(#arrow)"/>
 
-  <!-- L4: Runtime Control -->
+  <!-- ==================== L4: Runtime Control ==================== -->
   <g>
-    <rect x="100" y="394" width="480" height="56" rx="8" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/>
-    <text x="340" y="416" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 14px; font-weight: 500; font-family: var(--font-sans); color: #27500A;">L4 · Runtime Control</text>
-    <text x="340" y="436" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 13px; font-family: var(--font-sans); color: #5F5E5A;">OpenViking + 任务账本 + Outcome 回写 + 决策快照</text>
+    <rect x="190" y="362" width="400" height="44" rx="8" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/>
+    <text x="390" y="384" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 13px; font-weight: 500; font-family: var(--font-sans); color: #27500A;">L4 · Runtime Control — OpenViking + 账本 + Outcome + 快照</text>
   </g>
 
-  <!-- Learning Loop Label (right side) -->
-  <g transform="translate(620, 310)">
-    <rect x="-60" y="-80" width="80" height="160" rx="8" fill="#EEEDFE" stroke="#7F77DD" stroke-width="1"/>
-    <text x="0" y="-50" text-anchor="middle" dominant-baseline="central"
+  <!-- ==================== RIGHT: Learning Loop (enhanced) ==================== -->
+  <g transform="translate(618, 70)">
+    <rect x="-62" y="0" width="84" height="332" rx="10" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.8"/>
+
+    <!-- Header -->
+    <text x="-20" y="18" text-anchor="middle" dominant-baseline="central"
       style="font-size: 11px; font-weight: 500; font-family: var(--font-sans); color: #3C3489;">Learning</text>
-    <text x="0" y="-32" text-anchor="middle" dominant-baseline="central"
+    <text x="-20" y="34" text-anchor="middle" dominant-baseline="central"
       style="font-size: 11px; font-weight: 500; font-family: var(--font-sans); color: #3C3489;">Loop</text>
-    <text x="0" y="-10" text-anchor="middle" dominant-baseline="central"
+
+    <line x1="-50" y1="46" x2="10" y2="46" stroke="#7F77DD" stroke-width="0.3"/>
+
+    <!-- Original items -->
+    <text x="-20" y="64" text-anchor="middle" dominant-baseline="central"
       style="font-size: 10px; font-family: var(--font-sans); color: #5F5E5A;">决策记忆</text>
-    <text x="0" y="8" text-anchor="middle" dominant-baseline="central"
+    <text x="-20" y="82" text-anchor="middle" dominant-baseline="central"
       style="font-size: 10px; font-family: var(--font-sans); color: #5F5E5A;">偏好学习</text>
-    <text x="0" y="26" text-anchor="middle" dominant-baseline="central"
+    <text x="-20" y="100" text-anchor="middle" dominant-baseline="central"
       style="font-size: 10px; font-family: var(--font-sans); color: #5F5E5A;">语义召回</text>
-    <text x="0" y="44" text-anchor="middle" dominant-baseline="central"
+    <text x="-20" y="118" text-anchor="middle" dominant-baseline="central"
       style="font-size: 10px; font-family: var(--font-sans); color: #5F5E5A;">自进化</text>
-    <text x="0" y="62" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 10px; font-family: var(--font-sans); color: #5F5E5A;">Token Economics</text>
+
+    <line x1="-50" y1="132" x2="10" y2="132" stroke="#BA7517" stroke-width="0.5"/>
+
+    <!-- ===== Token Economics 子模块 (核心增强) ===== -->
+    <rect x="-54" y="142" width="76" height="22" rx="4" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.6"/>
+    <text x="-16" y="153" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-weight: 500; font-family: var(--font-sans); color: #854F0B;">Token Economics</text>
+
+    <text x="-20" y="174" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #854F0B;">LoadingTier 分级</text>
+    <text x="-20" y="190" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #854F0B;">模型推荐策略</text>
+    <text x="-20" y="206" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #854F0B;">预算门控</text>
+    <text x="-20" y="222" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #854F0B;">成本追踪 ROI</text>
+
+    <line x1="-50" y1="234" x2="10" y2="234" stroke="#1D9E75" stroke-width="0.5"/>
+
+    <!-- ===== TokenScope 集成策略 ===== -->
+    <rect x="-54" y="244" width="76" height="22" rx="4" fill="#E1F5EE" stroke="#1D9E75" stroke-width="0.6"/>
+    <text x="-16" y="255" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-weight: 500; font-family: var(--font-sans); color: #085041;">TokenScope</text>
+
+    <text x="-20" y="274" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #085041;">Turn 级审计</text>
+    <text x="-20" y="290" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #085041;">浪费检测 9 式</text>
+    <text x="-20" y="306" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #085041;">处方建议</text>
+    <text x="-20" y="322" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #085041;">统一定价引擎</text>
   </g>
 
   <!-- Arrows from Learning Loop to each layer -->
-  <line x1="560" y1="118" x2="620" y2="230" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
-  <line x1="560" y1="194" x2="620" y2="230" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
-  <line x1="560" y1="270" x2="620" y2="230" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
-  <line x1="560" y1="346" x2="620" y2="230" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
-  <line x1="560" y1="422" x2="620" y2="230" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
+  <line x1="590" y1="108" x2="618" y2="220" stroke="#7F77DD" stroke-width="0.8" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <line x1="590" y1="178" x2="618" y2="240" stroke="#7F77DD" stroke-width="0.8" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <line x1="590" y1="248" x2="618" y2="258" stroke="#7F77DD" stroke-width="0.8" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <line x1="590" y1="318" x2="618" y2="280" stroke="#7F77DD" stroke-width="0.8" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <line x1="590" y1="384" x2="618" y2="300" stroke="#7F77DD" stroke-width="0.8" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
 
-  <!-- Bottom note -->
-  <text x="340" y="480" text-anchor="middle" dominant-baseline="central"
-    style="font-size: 11px; font-family: var(--font-sans); fill: #888780;">Learning Loop 贯穿全层 — 每次决策都让下一次更好</text>
+  <!-- ==================== BOTTOM: Dual Optimization Goals ==================== -->
+  <g transform="translate(180, 426)">
+    <rect x="0" y="0" width="420" height="58" rx="10" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.8"/>
+    <text x="210" y="18" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 12px; font-weight: 500; font-family: var(--font-sans); color: #854F0B;">TokenCost 决策策略目标 — 双优化</text>
 
-  <!-- User & External (bottom) -->
-  <g>
-    <rect x="240" y="520" width="200" height="44" rx="8" fill="#F1EFE8" stroke="#888780" stroke-width="0.5"/>
-    <text x="340" y="542" text-anchor="middle" dominant-baseline="central"
-      style="font-size: 14px; font-weight: 500; font-family: var(--font-sans); color: #444441;">用户目标 / 外部数据</text>
+    <!-- Left goal: Max Quality -->
+    <rect x="20" y="30" width="180" height="20" rx="6" fill="#EAF3DE" stroke="#639922" stroke-width="0.5"/>
+    <text x="110" y="42" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 10.5px; font-weight: 500; font-family: var(--font-sans); color: #27500A;">输出质量最高 ↑</text>
+
+    <!-- Right goal: Min Token -->
+    <rect x="220" y="30" width="180" height="20" rx="6" fill="#E1F5EE" stroke="#1D9E75" stroke-width="0.5"/>
+    <text x="310" y="42" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 10.5px; font-weight: 500; font-family: var(--font-sans); color: #085041;">Token 消耗最低 ↓</text>
   </g>
 
-  <!-- Arrow from User to L0 -->
-  <line x1="340" y1="520" x2="340" y2="146" stroke="#888780" stroke-width="1" stroke-dasharray="2,2" marker-end="url(#arrow)"/>
+  <!-- Arrows from dual goals up to L2 (routing layer makes cost decisions) -->
+  <path d="M390 426 L390 414 Q390 408 390 406 L390 270" fill="none" stroke="#BA7517" stroke-width="0.8" stroke-dasharray="3,3" marker-end="url(#arrow-amber)"/>
+
+  <!-- Arrow from dual goals to Learning Loop (feedback) -->
+  <path d="M600 455 Q630 455 630 400 L630 210" fill="none" stroke="#1D9E75" stroke-width="0.8" stroke-dasharray="3,3" marker-end="url(#arrow-teal)"/>
+
+  <!-- ==================== BOTTOM STRATEGY DETAIL ==================== -->
+  <g transform="translate(180, 498)">
+    <!-- Strategy cards row -->
+    <rect x="0" y="0" width="98" height="68" rx="6" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.4"/>
+    <text x="49" y="16" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-weight: 500; font-family: var(--font-sans); color: #444441;">L0 Summary</text>
+    <text x="49" y="32" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">~100 tokens</text>
+    <text x="49" y="46" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">路由快决策</text>
+    <text x="49" y="58" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 8px; font-family: var(--font-sans); color: #888780;">economy 模型</text>
+
+    <rect x="106" y="0" width="98" height="68" rx="6" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.4"/>
+    <text x="155" y="16" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-weight: 500; font-family: var(--font-sans); color: #444441;">L1 Context</text>
+    <text x="155" y="32" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">~2K tokens</text>
+    <text x="155" y="46" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">规划阶段</text>
+    <text x="155" y="58" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 8px; font-family: var(--font-sans); color: #888780;">standard 模型</text>
+
+    <rect x="212" y="0" width="98" height="68" rx="6" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.4"/>
+    <text x="261" y="16" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-weight: 500; font-family: var(--font-sans); color: #444441;">L2 Full</text>
+    <text x="261" y="32" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">~8K tokens</text>
+    <text x="261" y="46" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">执行阶段</text>
+    <text x="261" y="58" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 8px; font-family: var(--font-sans); color: #888780;">premium 模型</text>
+
+    <rect x="318" y="0" width="102" height="68" rx="6" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+    <text x="369" y="16" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-weight: 500; font-family: var(--font-sans); color: #854F0B;">Model Tier</text>
+    <text x="369" y="32" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">Premium 1.0x</text>
+    <text x="369" y="44" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">Standard 0.3x</text>
+    <text x="369" y="56" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9px; font-family: var(--font-sans); color: #5F5E5A;">Economy 0.05x</text>
+  </g>
+
+  <!-- User input at very bottom -->
+  <g transform="translate(230, 582)">
+    <rect x="0" y="0" width="300" height="36" rx="8" fill="#F1EFE8" stroke="#888780" stroke-width="0.4"/>
+    <text x="150" y="12" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 11px; font-weight: 500; font-family: var(--font-sans); color: #444441;">用户目标 / 外部数据</text>
+    <text x="150" y="28" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #888780;">Claude · Codex · OpenClaw · Hermes · Gemini 统一接入</text>
+  </g>
+
+  <!-- Arrow from user to L0 -->
+  <line x1="380" y1="582" x2="380" y2="134" stroke="#888780" stroke-width="0.8" stroke-dasharray="2,2" marker-end="url(#arrow)"/>
+
+  <!-- Key insight banner -->
+  <text x="340" y="638" text-anchor="middle" dominant-baseline="central"
+    style="font-size: 10.5px; font-family: var(--font-sans); fill: #888780;">
+    Quality ↑ + Cost ↓ = TokenCost 双优化决策策略 | LoadingTier 自适应 + Model Tier 动态选 + Budget Gate 硬约束
+  </text>
+
+  <!-- TokenScope tag -->
+  <g transform="translate(480, 656)">
+    <rect x="0" y="0" width="160" height="22" rx="6" fill="#E1F5EE" stroke="#1D9E75" stroke-width="0.4"/>
+    <text x="80" y="13" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #085041;">TokenScope · Turn-level 审计</text>
+  </g>
+
+  <!-- Velaris tag -->
+  <g transform="translate(40, 656)">
+    <rect x="0" y="0" width="140" height="22" rx="6" fill="#EEEDFE" stroke="#7F77DD" stroke-width="0.4"/>
+    <text x="70" y="13" text-anchor="middle" dominant-baseline="central"
+      style="font-size: 9.5px; font-family: var(--font-sans); color: #3C3489;">Velaris v2.0 · UOW 1-8 ✅</text>
+  </g>
 </svg>

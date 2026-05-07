@@ -142,25 +142,35 @@ Velaris 解决的不是"让 Agent 能干活"或"让 Agent 越干越好"，而是
 下面这组分层说明从治理与编排视角展开，和上面的图集是互补关系。
 
 ```
-L0  Agent Runtime        OpenHarness engine — LLM 推理 + 工具调用编排
+L0  Agent Runtime        OpenHarness engine — 多 Provider LLM 推理 + 工具编排 + MCP 协议
 L1  Goal-to-Plan         场景识别（ScenarioRegistry 插件化）→ 能力规划 → 治理约束生成
-L2  Routing & Governance  DynamicRouter 四层路由 → 能力签发 → 停止条件
-L3  Decision Execution    多维评分 + 场景执行 + 数据自主抓取
+L2  Routing & Governance  DynamicRouter 四层路由 → 能力签发 → 成本感知 → 停止条件
+L3  Decision Execution    多维评分 + 场景执行 + 数据自主抓取 + Token 审计追踪
 L4  Runtime Control       OpenViking 上下文数据库 + 任务账本 + Outcome 回写 + 决策环境快照
-──  Learning Loop         决策记忆 + 偏好学习 + 语义召回 + 自进化 + Token Economics (贯穿全层)
+──  Learning Loop         决策记忆 + 偏好学习 + 语义召回 + 自进化 (贯穿全层)
+    ├─ Token Economics     LoadingTier 分级 + 模型推荐 + 预算门控 + 成本追踪 ROI
+    └─ TokenScope 集成      Turn 级审计 + 浪费检测 9 式 + 处方建议 + 统一定价引擎
+═══ Provider 接入          Claude Code · Codex (OpenAI) · OpenClaw · Hermes · Gemini CLI
+═══ 双优化目标              输出质量最高 ↑ + Token 消耗最低 ↓
 ```
 
-**Layer 0: Agent Loop** — 基于 OpenHarness engine，流式 LLM 推理 + 多轮工具调用编排。不写死 pipeline，让 LLM 自主决定调什么工具、调几次。
+**Layer 0: Agent Loop** — 基于 OpenHarness engine，支持 **多 Provider 接入**（Claude Code / Codex-OpenAI / OpenClaw / Hermes / Gemini CLI），流式 LLM 推理 + 多轮工具调用编排。通过统一 MCP 协议适配不同平台的工具生态，不锁定单一供应商。
 
 **Layer 1: Goal-to-Plan Compiler** — `build_capability_plan()` 把自然语言目标编译为结构化 plan（场景、能力集、权重、治理约束、推荐工具链）。`ScenarioRegistry` 插件化管理场景，新场景通过 SKILL.md 声明即可注册，无需改 engine.py。
 
-**Layer 2: Routing & Governance** — `DynamicRouter` 四层路由引擎（规则匹配 → 场景语义 → 成本约束 → 降级兜底），替代静态 YAML 规则，运行时感知成本、负载、SLA 等指标动态调整路由权重。`AuthorityService` 签发短时能力令牌。
+**Layer 2: Routing & Governance** — `DynamicRouter` 四层路由引擎（规则匹配 → 场景语义 → 成本约束 → 降级兜底）。**TokenCost 决策策略在此层注入**：LoadingTier 分级（L0 100tok / L1 2ktok / L2 8ktok）按预算动态选择上下文加载量；Model Tier 自适应推荐（Premium 1.0x / Standard 0.3x / Economy 0.05x）按复杂度×预算矩阵决策；Budget Gate 硬约束防止超支。`AuthorityService` 签发短时能力令牌。
 
-**Layer 3: Decision Execution** — Agent 通过工具自主抓取决策所需数据（机票价格、模型成本、车辆状态等），然后执行多维评分和场景逻辑。数据不需要预置，Agent 自己获取。
+**Layer 3: Decision Execution** — Agent 通过工具自主抓取决策所需数据（机票价格、模型成本、车辆状态等），然后执行多维评分和场景逻辑。集成 **DecisionCostTracker** 做 Turn-level Token 审计追踪，每次执行自动记录 input/output token 消耗与模型等级。
 
 **Layer 4: Runtime Control** — `OpenViking` 上下文数据库提供统一的上下文存储与检索（`viking://` URI scheme + L0/L1/L2 三层渐进加载），`TaskLedger` 跟踪执行状态，`OutcomeStore` 回写结果，决策环境快照记录完整决策上下文。
 
-**Learning Loop** — 贯穿全层：`DecisionMemory` 存储完整决策记录，`PreferenceLearner` 从用户实际选择中学习个性化权重（贝叶斯先验 + 指数衰减），`SemanticRecallEngine` 语义召回相似历史决策，`SkillEvolutionLoop` 技能自进化（collect_feedback → learn → validate → deploy 四步闭环），`CostOptimizer` Token 经济学优化（加载分级 + 模型推荐 + 预算门控），`SelfEvolutionEngine` 定期复盘并联动成本追踪。
+**Learning Loop** — 贯穿全层的自改进闭环：`DecisionMemory` 存储完整决策记录，`PreferenceLearner` 从用户实际选择中学习个性化权重（贝叶斯先验 + 指数衰减），`SemanticRecallEngine` 语义召回相似历史决策，`SkillEvolutionLoop` 技能自进化（collect_feedback → learn → validate → deploy 四步闭环）。
+
+**Token Economics (UOW-8)** — Learning Loop 的核心增强模块：`CostOptimizer` 提供 LoadingTier 分级优化、模型推荐策略和预算门控；`DecisionCostTracker` 记录每次决策的 Token 消耗并计算 ROI；`SelfEvolutionEngine` 联动成本数据给出降本建议。双优化目标：**输出质量最高 + Token 消耗最低**。
+
+**TokenScope 集成** — 对接 AI TokenCost 产品能力的策略层：Turn 级成本审计（精确到每个 LLM 调用的 input/output/cacheRead/cacheWrite × 单价拆解）、9 种浪费模式检测（zero-output / poor-cache-hit / repeated-large-context / dead-end-loop 等）、处方建议（每条含 trigger reason + action + savingsWeekly）、统一定价引擎（覆盖 Anthropic/OpenAI/Google 30+ 模型家族的官方价格 + 长上下文阶梯价）。
+
+**Provider 接入层** — 左侧统一接入 5 大平台：Claude Code、Codex (OpenAI)、OpenClaw、Hermes、Gemini CLI。各平台通过 Adapter 层适配为统一的 StructuredDataSource，路由策略 (`routing-policy.yaml`) 支持本地闭环 / 委托 Claude Code / 委托 RobotClaw / 混合模式四种运行策略。
 
 ### 决策环境快照（Decision Context Snapshot）
 
