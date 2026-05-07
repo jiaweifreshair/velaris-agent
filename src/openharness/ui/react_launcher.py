@@ -138,6 +138,9 @@ async def launch_react_tui(
             raise RuntimeError("Failed to install React terminal frontend dependencies")
 
     env = os.environ.copy()
+    if sys.platform == "win32":
+        env.setdefault("PYTHONUTF8", "1")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
     frontend_config_payload: dict[str, object] = {
         "backend_command": build_backend_command(
             cwd=cwd or str(Path.cwd()),
