@@ -17,7 +17,6 @@ from typing import Any
 
 from velaris_agent.context.loading_strategy import (
     LoadingTier,
-    get_tier_token_budget,
     resolve_loading_tier,
     resolve_target_path,
     truncate_to_budget,

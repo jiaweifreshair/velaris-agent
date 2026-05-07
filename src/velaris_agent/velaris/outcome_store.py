@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any
 
 
@@ -93,7 +93,7 @@ class OutcomeStore:
             reason_codes=reason_codes,
             summary=summary,
             metrics=metrics or {},
-            created_at=datetime.now(UTC).isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
         self._records.append(record)
         return record

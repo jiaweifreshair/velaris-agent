@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
@@ -12,7 +12,6 @@ from velaris_agent.memory.types import StakeholderMapModel
 from velaris_agent.persistence.factory import (
     build_audit_store,
     build_execution_repository,
-    build_openviking_context,
     build_outcome_store,
     build_session_repository,
     build_task_ledger,
@@ -625,7 +624,7 @@ class VelarisBizOrchestrator:
     ) -> BizExecutionRecord:
         """创建 execution 主记录的初始快照。"""
 
-        timestamp = datetime.now(UTC).isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         return BizExecutionRecord(
             execution_id=f"exec-{uuid4().hex[:12]}",
             session_id=session_id,
@@ -669,7 +668,7 @@ class VelarisBizOrchestrator:
             constraint_complete=execution.constraint_complete if constraint_complete is None else constraint_complete,
             goal_complete=execution.goal_complete if goal_complete is None else goal_complete,
             created_at=execution.created_at,
-            updated_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
             resume_cursor=dict(execution.resume_cursor or {}) if resume_cursor is None else dict(resume_cursor),
         )
 

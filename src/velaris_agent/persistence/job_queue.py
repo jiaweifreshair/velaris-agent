@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -546,7 +546,7 @@ def _load_json(value: Any) -> dict[str, Any]:
 def _utc_now() -> datetime:
     """返回统一的 UTC 当前时间。"""
 
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def _optional_text(value: Any) -> str | None:

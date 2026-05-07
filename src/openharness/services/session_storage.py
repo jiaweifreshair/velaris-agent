@@ -6,7 +6,7 @@ SQLite 主线：session 快照存储在项目内 SQLite（<project>/.velaris-age
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 import json
 import time
 from hashlib import sha1
@@ -100,7 +100,7 @@ def save_session_snapshot(
         "message_count": len(messages),
     }
 
-    timestamp = datetime.now(UTC).isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
     repository = _load_session_repository(cwd=cwd)
     repository.upsert(
         SessionRecord(

@@ -6,13 +6,11 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from velaris_agent.context.loading_strategy import LoadingTier
 from velaris_agent.context.openviking_context import OpenVikingContext
-from velaris_agent.context.uri_scheme import VikingResource, VikingSubject, build_viking_uri
 
 
 class TestOpenVikingContextInit:

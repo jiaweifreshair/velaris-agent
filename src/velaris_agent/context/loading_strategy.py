@@ -11,7 +11,6 @@ OpenViking 的核心优化：根据使用场景按需加载不同粒度的上下
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
 from velaris_agent.context.uri_scheme import VikingURI
 

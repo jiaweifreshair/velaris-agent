@@ -13,7 +13,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -395,7 +396,7 @@ class CostOptimizer:
             报告字典
         """
         report: dict[str, Any] = {
-            "generated_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "total_budget": self._total_budget,
         }
 

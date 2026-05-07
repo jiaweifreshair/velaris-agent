@@ -13,9 +13,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Any
-from uuid import uuid4
 
 
 @dataclass(frozen=True)
@@ -144,7 +143,7 @@ class DecisionCostTracker:
             token_input=max(0, token_input),
             token_output=max(0, token_output),
             latency_ms=max(0.0, latency_ms),
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             session_id=session_id,
             metadata=metadata or {},
         )
@@ -161,7 +160,7 @@ class DecisionCostTracker:
         Returns:
             ROIReport 报告
         """
-        cutoff = datetime.now(UTC) - timedelta(days=period_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
         filtered = [
             r for r in self._records
             if (scenario is None or r.scenario == scenario)
@@ -226,7 +225,7 @@ class DecisionCostTracker:
             rate_per_hour = consumed / elapsed_hours
             if rate_per_hour > 0:
                 hours_to_deplete = remaining / rate_per_hour
-                depletion_dt = datetime.now(UTC) + timedelta(hours=hours_to_deplete)
+                depletion_dt = datetime.now(timezone.utc) + timedelta(hours=hours_to_deplete)
                 projected_date = depletion_dt.isoformat()
 
         return BudgetStatus(
@@ -243,7 +242,7 @@ class DecisionCostTracker:
         Returns:
             {scenario_name: {executions, total_cost, avg_latency, ...}}
         """
-        cutoff = datetime.now(UTC) - timedelta(days=period_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
         filtered = [
             r for r in self._records
             if datetime.fromisoformat(r.timestamp) >= cutoff

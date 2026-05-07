@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
 
 from velaris_agent.evolution.cost_optimizer import (
-    BudgetGateResult,
     ComplexityLevel,
     CostOptimizer,
     LoadingTier,
@@ -223,7 +221,7 @@ class TestSuggest:
 
     def test_suggest_quality_impact_minimal_on_slight_downgrade(self):
         optimizer = CostOptimizer(total_budget=10000.0)
-        suggestion = optimizer.suggest(
+        optimizer.suggest(
             "tokencost",
             remaining_budget=8000.0,
             current_tier="L1",

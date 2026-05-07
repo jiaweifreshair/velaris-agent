@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -72,6 +72,6 @@ class AuthorityService:
                 token_id=f"cap-{uuid4().hex[:12]}",
                 scope=required_capabilities,
                 ttl_seconds=self.default_token_ttl_seconds,
-                issued_at=datetime.now(UTC).isoformat(),
+                issued_at=datetime.now(timezone.utc).isoformat(),
             )
         ]

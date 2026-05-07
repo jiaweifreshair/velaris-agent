@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -69,7 +69,7 @@ class TaskLedger:
         depends_on: list[str] | None = None,
     ) -> TaskLedgerRecord:
         """创建一个账本任务。"""
-        timestamp = datetime.now(UTC).isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         task = TaskLedgerRecord(
             task_id=f"task-{uuid4().hex[:12]}",
             session_id=session_id,
@@ -91,7 +91,7 @@ class TaskLedger:
             return None
         task.status = status
         task.error = error
-        task.updated_at = datetime.now(UTC).isoformat()
+        task.updated_at = datetime.now(timezone.utc).isoformat()
         self._tasks[task_id] = task
         return task
 

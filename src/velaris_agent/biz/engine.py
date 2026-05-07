@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -1489,4 +1489,4 @@ def _replace_route_in_label(label: str, origin: str, destination: str) -> str:
 
 def _now_iso() -> str:
     """返回统一的 UTC ISO 时间戳。"""
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()

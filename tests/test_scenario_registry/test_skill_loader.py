@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pytest
 
-from velaris_agent.scenarios.skill_loader import ScenarioSpec, load_skill_md, scan_scenario_dir
+from velaris_agent.scenarios.skill_loader import load_skill_md, scan_scenario_dir
 
 
 def _write_skill_md(directory: Path, name: str, content: str) -> Path:

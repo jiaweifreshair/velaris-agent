@@ -7,7 +7,6 @@ import pytest
 from velaris_agent.context.uri_scheme import (
     VikingResource,
     VikingSubject,
-    VikingURI,
     build_viking_uri,
     parse_viking_uri,
 )

@@ -63,7 +63,6 @@ class TestRouterRegistryIntegration:
 
     def test_router_with_custom_registry(self, tmp_path: Path) -> None:
         """PolicyRouter 可以注入自定义 registry。"""
-        from velaris_agent.scenarios.skill_loader import load_skill_md
 
         # 创建自定义 registry
         reg = ScenarioRegistry(scenarios_dir=tmp_path)

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 
 from velaris_agent.velaris.cost_tracker import DecisionCostTracker
-from velaris_agent.velaris.dynamic_router import DynamicRouter, ModelTier, RoutingContext, TokenBudget
+from velaris_agent.velaris.dynamic_router import DynamicRouter
 from velaris_agent.velaris.orchestrator import VelarisBizOrchestrator
 
 
@@ -55,7 +54,7 @@ class TestExecutionCostTracking:
         """配置了 CostTracker 时，执行后自动记录。"""
         tracker = DecisionCostTracker(total_budget=10000.0)
         orch = VelarisBizOrchestrator(cost_tracker=tracker)
-        result = orch.execute(
+        orch.execute(
             query="帮我选机票",
             payload={},
             scenario="travel",
@@ -81,7 +80,7 @@ class TestExecutionCostTracking:
         router = DynamicRouter()
         tracker = DecisionCostTracker()
         orch = VelarisBizOrchestrator(dynamic_router=router, cost_tracker=tracker)
-        result = orch.execute(
+        orch.execute(
             query="帮我选机票",
             payload={},
             scenario="travel",

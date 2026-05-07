@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
@@ -89,7 +89,7 @@ class PolicyRouter:
             trace={
                 "evaluated_rules": evaluated_rules,
                 "selected_rule": selected_rule_id,
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "policy_id": self.policy.get("policy_id"),
                 "routing_context": routing_context,
             },

@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 
@@ -96,7 +96,7 @@ class ExecutionRepairService:
 
         repair_snapshot = dict(snapshot_json)
         repair_snapshot["audit_repair"] = {
-            "repaired_at": datetime.now(UTC).isoformat(),
+            "repaired_at": datetime.now(timezone.utc).isoformat(),
             "audit_status_before": audit_status_before,
             "events_appended": events_appended,
         }
@@ -112,7 +112,7 @@ class ExecutionRepairService:
             goal_complete=execution.goal_complete,
             resume_cursor=execution.resume_cursor,
             snapshot_json=repair_snapshot,
-            updated_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
         if repaired is None:  # pragma: no cover
             raise RuntimeError(f"Execution disappeared during repair: {execution_id}")

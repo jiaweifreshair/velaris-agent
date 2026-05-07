@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any, Protocol
 
 from velaris_agent.persistence.sqlite_execution import SessionRecord
@@ -254,4 +254,4 @@ class PreExecutionPersistenceBarrier:
 def _now_iso() -> str:
     """生成 barrier 内部统一使用的 ISO 时间戳。"""
 
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()

@@ -5,15 +5,12 @@ from __future__ import annotations
 import pytest
 
 from velaris_agent.velaris.dynamic_router import (
-    AdjustmentTrace,
     ComplianceContext,
     ComplianceRegion,
     DynamicRouter,
-    DynamicRoutingDecision,
     ModelTier,
     RoutingContext,
     SLARequirement,
-    SelectedRoute,
     TokenBudget,
 )
 from velaris_agent.velaris.router import PolicyRouter

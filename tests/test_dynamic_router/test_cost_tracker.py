@@ -5,10 +5,8 @@ from __future__ import annotations
 import pytest
 
 from velaris_agent.velaris.cost_tracker import (
-    BudgetStatus,
     CostRecord,
     DecisionCostTracker,
-    ROIReport,
 )
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -11,7 +10,6 @@ from velaris_agent.biz.engine import (
     get_scenario_registry,
     infer_scenario,
     run_scenario,
-    score_options,
 )
 
 

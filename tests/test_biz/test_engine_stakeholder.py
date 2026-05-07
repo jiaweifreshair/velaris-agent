@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from velaris_agent.biz.engine import build_capability_plan
 from velaris_agent.memory.types import (
@@ -30,7 +30,7 @@ def _make_stakeholder_map(
         stakeholders=stakeholders or [],
         alignment_matrix=alignment_matrix or [],
         conflicts=conflicts or [],
-        timestamp=datetime.now(UTC),
+        timestamp=datetime.now(timezone.utc),
     )
 
 

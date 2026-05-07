@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -57,7 +57,7 @@ def _make_procurement_stakeholder_map() -> StakeholderMapModel:
         ],
         alignment_matrix=[],
         conflicts=[],
-        timestamp=datetime.now(UTC),
+        timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -109,7 +109,7 @@ def _make_quality_focused_procurement_stakeholder_map() -> StakeholderMapModel:
         ],
         alignment_matrix=[],
         conflicts=[],
-        timestamp=datetime.now(UTC),
+        timestamp=datetime.now(timezone.utc),
     )
 
 

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-import pytest
 
 from velaris_agent.persistence.factory import (
     _resolve_openviking_path,

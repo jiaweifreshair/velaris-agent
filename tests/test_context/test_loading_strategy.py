@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from velaris_agent.context.loading_strategy import (
     LoadingTier,
@@ -11,7 +10,7 @@ from velaris_agent.context.loading_strategy import (
     resolve_target_path,
     truncate_to_budget,
 )
-from velaris_agent.context.uri_scheme import VikingResource, VikingSubject, build_viking_uri
+from velaris_agent.context.uri_scheme import build_viking_uri
 
 
 class TestLoadingTierResolution:

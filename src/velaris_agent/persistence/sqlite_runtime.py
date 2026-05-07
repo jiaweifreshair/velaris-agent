@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 import json
 from typing import Any
 from uuid import uuid4
@@ -180,7 +180,7 @@ class SqliteTaskLedger(TaskLedger, _SqlitePayloadStore):
     ) -> TaskLedgerRecord:
         """创建任务并落库，保持与内存账本一致的默认状态。"""
 
-        created_at_value = datetime.now(UTC)
+        created_at_value = datetime.now(timezone.utc)
         timestamp = created_at_value.isoformat()
         task = TaskLedgerRecord(
             task_id=f"task-{uuid4().hex[:12]}",
@@ -205,7 +205,7 @@ class SqliteTaskLedger(TaskLedger, _SqlitePayloadStore):
         task = TaskLedgerRecord.from_dict(payload)
         task.status = status
         task.error = error
-        task.updated_at = datetime.now(UTC).isoformat()
+        task.updated_at = datetime.now(timezone.utc).isoformat()
         self._update_payload(task_id, task.to_dict())
         return task
 
@@ -243,7 +243,7 @@ class SqliteOutcomeStore(OutcomeStore, _SqlitePayloadStore):
     ) -> OutcomeRecord:
         """写入一条 outcome 快照并返回标准化记录。"""
 
-        created_at_value = datetime.now(UTC)
+        created_at_value = datetime.now(timezone.utc)
         redacted_metrics = self._payload_redactor.redact_mapping(metrics or {})
         record = OutcomeRecord(
             session_id=session_id,
@@ -282,7 +282,7 @@ class SqliteAuditEventStore(_SqlitePayloadStore):
     ) -> AuditEventRecord:
         """追加一条审计事件，记录编排关键步骤发生了什么。"""
 
-        created_at_value = datetime.now(UTC)
+        created_at_value = datetime.now(timezone.utc)
         redacted_payload = self._payload_redactor.redact_mapping(payload or {})
         event = AuditEventRecord(
             event_id=f"audit-{uuid4().hex[:12]}",

@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 
 from velaris_agent.memory.semantic_recall import (
     HybridRecallEngine,
-    IndexedRecord,
     RecallResult,
     SemanticRecallEngine,
     SimpleHashEmbedding,
@@ -318,7 +317,7 @@ class TestSemanticVsKeyword:
             record = _make_record("dec-001", query="帮我订机票去北京出差")
             mem.save(record)
             # 用释义查询 keyword 召回
-            results = mem.recall_similar("alice", "travel", "北京出差机票预订")
+            mem.recall_similar("alice", "travel", "北京出差机票预订")
             # keyword 可能找不到（因为没有关键词重叠）
             # 这不是错误，只是说明 keyword 的局限
 

@@ -18,9 +18,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from typing import Any, Protocol
-from uuid import uuid4
 
 from velaris_agent.memory.types import DecisionRecord
 
@@ -367,7 +366,7 @@ class SemanticRecallEngine:
             query=indexed.query,
             options=[],         # 索引不存储完整选项
             recommended={},     # 索引不存储推荐
-            created_at=indexed.created_at or datetime.now(UTC).isoformat(),
+            created_at=indexed.created_at or datetime.now(timezone.utc).isoformat(),
         )
 
     def _evict_oldest(self) -> None:

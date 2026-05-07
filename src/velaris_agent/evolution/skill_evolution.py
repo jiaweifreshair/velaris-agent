@@ -14,15 +14,14 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from velaris_agent.evolution.types import EvolutionAction, SelfEvolutionReport
-from velaris_agent.velaris.cost_tracker import CostRecord, DecisionCostTracker, ROIReport
+from velaris_agent.velaris.cost_tracker import CostRecord, DecisionCostTracker
 
 
 # ── 数据模型 ────────────────────────────────────────────────
@@ -39,7 +38,7 @@ class SkillFeedback(BaseModel):
     latency_ms: float = Field(default=0.0, description="延迟 ms")
     model_tier: str = Field(default="standard", description="使用的模型等级")
     metadata: dict[str, Any] = Field(default_factory=dict, description="额外元数据")
-    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), description="时间戳")
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="时间戳")
 
 
 class SkillMutation(BaseModel):
@@ -55,7 +54,7 @@ class SkillMutation(BaseModel):
     source_feedback_ids: list[str] = Field(default_factory=list, description="来源反馈 IDs")
     validated: bool = Field(default=False, description="是否已通过验证")
     deployed: bool = Field(default=False, description="是否已部署")
-    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), description="创建时间")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="创建时间")
 
 
 class EvolutionCycleResult(BaseModel):
@@ -68,7 +67,7 @@ class EvolutionCycleResult(BaseModel):
     mutations_validated: int = Field(description="通过验证的变更数量")
     mutations_deployed: int = Field(description="部署的变更数量")
     details: list[SkillMutation] = Field(default_factory=list, description="变更详情")
-    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 # ── SkillEvolutionLoop ───────────────────────────────────────

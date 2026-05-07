@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from velaris_agent.evolution.skill_evolution import (
     EvolutionCycleResult,
@@ -12,7 +11,7 @@ from velaris_agent.evolution.skill_evolution import (
     SkillFeedback,
     SkillMutation,
 )
-from velaris_agent.velaris.cost_tracker import CostRecord, DecisionCostTracker
+from velaris_agent.velaris.cost_tracker import DecisionCostTracker
 
 
 # ── 1. SkillFeedback 测试 ──────────────────────────────────────
