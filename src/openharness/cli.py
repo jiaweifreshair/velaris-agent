@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -13,6 +14,8 @@ from openharness.commands.skills_cli import skills_app
 
 if TYPE_CHECKING:
     from openharness.api.registry import ProviderSpec
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="velaris",
@@ -844,6 +847,11 @@ def main(
     ),
 ) -> None:
     """Start an interactive session or run a single prompt."""
+    from openharness.config import setup_logging
+
+    log_path = setup_logging()
+    logger.info("CLI started command=%s log_file=%s", ctx.invoked_subcommand or "repl", log_path)
+
     if ctx.invoked_subcommand is not None:
         return
 
