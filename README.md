@@ -114,7 +114,7 @@ Velaris 解决的不是"让 Agent 能干活"或"让 Agent 越干越好"，而是
 
 <p align="center">
   <a href="assets/architecture-velaris.svg">
-    <img src="assets/architecture-velaris.png" alt="Velaris Ontology-Guided Goal-Oriented Decision Agent Architecture" width="900">
+    <img src="assets/architecture-velaris.svg" alt="Velaris Ontology-Guided Goal-Oriented Decision Agent Architecture" width="900">
   </a>
 </p>
 
