@@ -558,6 +558,7 @@ async def test_web_fetch_real():
 # ====================================================================
 # 11. Worktree: real git worktree create/list/remove
 # ====================================================================
+@pytest.mark.skipif(bool(os.environ.get("GITHUB_ACTIONS")), reason="git worktree requires full history (shallow clone in CI)")
 async def test_worktree_real_git():
     """Create a real git worktree, list it, remove it."""
     from openharness.swarm.worktree import WorktreeManager

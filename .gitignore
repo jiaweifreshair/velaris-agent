@@ -47,10 +47,8 @@ docs/SMART-TRAVEL-CONCIERGE-PRD.md
 node_modules/
 uv.lock
 
-# Commercial scenarios (not tracked in public repo)
-src/velaris_agent/scenarios/robotclaw/
-src/velaris_agent/scenarios/travel/
-src/velaris_agent/scenarios/tokencost/
+# Commercial scenarios — SKILL.md is tracked (tests depend on it);
+# tool implementations remain private
 src/openharness/tools/travel_recommend_tool.py
 src/openharness/tools/tokencost_analyze_tool.py
 src/openharness/tools/robotclaw_dispatch_tool.py

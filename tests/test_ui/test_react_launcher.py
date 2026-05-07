@@ -110,7 +110,7 @@ async def test_launch_react_tui_reinstalls_when_esbuild_arch_mismatch(tmp_path, 
         return FakeProcess()
 
     monkeypatch.setattr("openharness.ui.react_launcher.get_frontend_dir", lambda: frontend_dir)
-    monkeypatch.setattr("openharness.ui.react_launcher.platform.machine", lambda: "arm64")
+    monkeypatch.setattr("openharness.ui.react_launcher.platform.machine", lambda machine=None: "arm64")
     monkeypatch.setattr("openharness.ui.react_launcher.asyncio.create_subprocess_exec", fake_create_subprocess_exec)
 
     await launch_react_tui(prompt="hi")
