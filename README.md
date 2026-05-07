@@ -108,9 +108,17 @@ Velaris 解决的不是"让 Agent 能干活"或"让 Agent 越干越好"，而是
 
 ## Architecture
 
-### 先看这 3 张图
+### 先看这 4 张图
 
-如果只看一张，先看第一张总览；如果关心落地场景，第二、三张更贴近真实使用路径。
+第一张是 **Ontology-Guided 主架构**（最新，含决策主体层 + Token Economics + Multi-Agent 接入）；如果关心落地场景，第二、三张更贴近真实使用路径。
+
+<p align="center">
+  <a href="assets/architecture-velaris.svg">
+    <img src="assets/architecture-velaris.png" alt="Velaris Ontology-Guided Goal-Oriented Decision Agent Architecture" width="900">
+  </a>
+</p>
+
+<p align="center"><strong>0. ⬡ Ontology 决策智能体主架构</strong>：目标导向本体决策主体 + 五层运行时 + Learning Loop + Token Economics 双优化 + Multi-Agent 就绪。</p>
 
 <p align="center">
   <a href="docs/diagrams/velaris-architecture.svg">
