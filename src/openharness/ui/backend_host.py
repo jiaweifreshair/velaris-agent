@@ -21,6 +21,7 @@ from openharness.engine.stream_events import (
 )
 from openharness.tasks import get_task_manager
 from openharness.ui.protocol import BackendEvent, FrontendRequest, TranscriptItem
+from openharness.ui.react_launcher import setup_logging
 from openharness.ui.runtime import build_runtime, close_runtime, handle_line, start_runtime
 
 _PROTOCOL_PREFIX = "OHJSON:"
@@ -44,6 +45,7 @@ class ReactBackendHost:
     """Drive the OpenHarness runtime over a structured stdin/stdout protocol."""
 
     def __init__(self, config: BackendHostConfig) -> None:
+        setup_logging("velaris.backend")
         self._config = config
         self._bundle = None
         self._write_lock = asyncio.Lock()
