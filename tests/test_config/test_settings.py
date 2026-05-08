@@ -124,18 +124,94 @@ class TestLoadSaveSettings:
         assert s.security.approval_mode == "smart"
         assert s.security.scan_project_instructions is False
 
-    def test_load_applies_env_overrides(self, tmp_path: Path, monkeypatch):
+    def test_load_applies_env_overrides_model(self, tmp_path: Path, monkeypatch):
+        """Env var 应覆盖文件中已配置的 model 值。"""
         path = tmp_path / "settings.json"
         path.write_text(json.dumps({"model": "from-file", "base_url": "https://file.example"}))
         monkeypatch.setenv("ANTHROPIC_MODEL", "from-env-model")
-        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://env.example/anthropic")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-override")
 
         s = load_settings(path)
 
         assert s.model == "from-env-model"
+
+    def test_load_applies_env_overrides_base_url(self, tmp_path: Path, monkeypatch):
+        """Env var 应覆盖文件中已配置的 base_url 值。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"model": "from-file", "base_url": "https://file.example"}))
+        monkeypatch.setenv("ANTHROPIC_MODEL", "from-env-model")
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://env.example/anthropic")
+
+        s = load_settings(path)
+
         assert s.base_url == "https://env.example/anthropic"
+
+    def test_load_applies_env_overrides_api_key(self, tmp_path: Path, monkeypatch):
+        """Env var 应覆盖文件中已配置的 api_key 值。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"model": "from-file", "api_key": "sk-from-file"}))
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-override")
+
+        s = load_settings(path)
+
         assert s.api_key == "sk-env-override"
+
+    def test_load_applies_provider_env_override(self, tmp_path: Path, monkeypatch):
+        """Env var 应覆盖文件中已配置的 provider 值。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"provider": "anthropic", "model": "claude-sonnet-4-20250514"}))
+        monkeypatch.setenv("VELARIS_PROVIDER", "moonshot")
+
+        s = load_settings(path)
+
+        assert s.provider == "moonshot"
+
+    def test_load_applies_api_format_env_override(self, tmp_path: Path, monkeypatch):
+        """Env var 应覆盖文件中已配置的 api_format 值。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"provider": "anthropic", "api_format": "anthropic"}))
+        monkeypatch.setenv("VELARIS_API_FORMAT", "openai_compat")
+
+        s = load_settings(path)
+
+        assert s.api_format == "openai_compat"
+
+    def test_load_applies_max_tokens_env_override(self, tmp_path: Path, monkeypatch):
+        """Env var 应覆盖文件中已配置的 max_tokens 值。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"max_tokens": 8192}))
+        monkeypatch.setenv("VELARIS_MAX_TOKENS", "32768")
+
+        s = load_settings(path)
+
+        assert s.max_tokens == 32768
+
+    def test_load_applies_all_env_overrides_together(self, tmp_path: Path, monkeypatch):
+        """多个 env vars 应同时覆盖文件中的多个值。"""
+        path = tmp_path / "settings.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "provider": "anthropic",
+                    "model": "claude-sonnet-4-20250514",
+                    "api_format": "anthropic",
+                    "max_tokens": 8192,
+                    "base_url": "https://file.example",
+                }
+            )
+        )
+        monkeypatch.setenv("VELARIS_PROVIDER", "moonshot")
+        monkeypatch.setenv("ANTHROPIC_MODEL", "claude-opus-4-20250514")
+        monkeypatch.setenv("VELARIS_API_FORMAT", "openai_compat")
+        monkeypatch.setenv("VELARIS_MAX_TOKENS", "65536")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-all")
+
+        s = load_settings(path)
+
+        assert s.provider == "moonshot"
+        assert s.model == "claude-opus-4-20250514"
+        assert s.api_format == "openai_compat"
+        assert s.max_tokens == 65536
+        assert s.api_key == "sk-env-all"
 
     def test_load_applies_provider_and_compact_env_overrides(self, tmp_path: Path, monkeypatch):
         """Provider 和 compact 阈值应允许通过环境变量覆盖。"""
