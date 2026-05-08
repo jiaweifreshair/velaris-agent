@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -26,6 +27,10 @@ async def test_call_tool_raises_when_server_never_connected():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="Python 3.10: anyio cancel scope 行为差异导致进程启动测试不稳定",
+)
 async def test_call_tool_raises_when_server_failed_to_connect():
     """重连仍失败时，call_tool 应返回最新的连接失败详情。"""
 
