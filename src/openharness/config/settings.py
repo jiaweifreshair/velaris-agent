@@ -161,14 +161,13 @@ def _apply_env_overrides(settings: Settings) -> Settings:
     if api_format:
         updates["api_format"] = api_format
 
-    if not settings.model or settings.model == Settings().model:
-        model = (
-            os.environ.get("ANTHROPIC_MODEL")
-            or os.environ.get("VELARIS_MODEL")
-            or os.environ.get("OPENHARNESS_MODEL")
-        )
-        if model:
-            updates["model"] = model
+    model = (
+        os.environ.get("ANTHROPIC_MODEL")
+        or os.environ.get("VELARIS_MODEL")
+        or os.environ.get("OPENHARNESS_MODEL")
+    )
+    if model:
+        updates["model"] = model
 
     candidate = settings.model_copy(update=updates) if updates else settings
     provider_spec = infer_provider_spec(
@@ -209,16 +208,15 @@ def _apply_env_overrides(settings: Settings) -> Settings:
         updates["storage"] = settings.storage.model_copy(update=storage_updates)
 
     candidate = settings.model_copy(update=updates) if updates else settings
-    if not candidate.api_key:
-        api_key = resolve_api_key_from_env(
-            provider_name=candidate.provider,
-            model=candidate.model,
-            base_url=candidate.base_url,
-            api_key=candidate.api_key,
-            api_format=candidate.api_format,
-        )
-        if api_key:
-            updates["api_key"] = api_key
+    api_key = resolve_api_key_from_env(
+        provider_name=candidate.provider,
+        model=candidate.model,
+        base_url=candidate.base_url,
+        api_key=candidate.api_key,
+        api_format=candidate.api_format,
+    )
+    if api_key:
+        updates["api_key"] = api_key
 
     if not updates:
         return settings
