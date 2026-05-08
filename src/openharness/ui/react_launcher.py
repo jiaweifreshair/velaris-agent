@@ -235,6 +235,9 @@ async def launch_react_tui(
 
     # Prepare environment for the React TUI process.
     env = os.environ.copy()
+    if sys.platform == "win32":
+        env.setdefault("PYTHONUTF8", "1")
+        env.setdefault("PYTHONIOENCODING", "utf-8")
     frontend_config_payload: dict[str, object] = {
         "backend_command": build_backend_command(
             cwd=cwd or str(Path.cwd()),
