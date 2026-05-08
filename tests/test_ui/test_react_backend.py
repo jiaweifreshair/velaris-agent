@@ -5,9 +5,11 @@ from __future__ import annotations
 import pytest
 
 from openharness.api.client import ApiMessageCompleteEvent
+from openharness.api.errors import AuthenticationFailure
 from openharness.api.usage import UsageSnapshot
 from openharness.engine.messages import ConversationMessage, TextBlock
 from openharness.mcp.types import McpConnectionStatus, McpResourceInfo, McpToolInfo
+from openharness.ui.protocol import FrontendRequest
 from openharness.ui.backend_host import BackendHostConfig, ReactBackendHost, run_backend_host
 from openharness.ui.runtime import build_runtime, close_runtime, start_runtime
 
@@ -25,6 +27,15 @@ class StaticApiClient:
             usage=UsageSnapshot(input_tokens=2, output_tokens=3),
             stop_reason=None,
         )
+
+
+class FailingApiClient:
+    """Fake client that raises the same class used for provider auth failures."""
+
+    async def stream_message(self, request):
+        del request
+        raise AuthenticationFailure("INVALID_API_KEY")
+        yield  # pragma: no cover
 
 
 class StaticMcpManager:
@@ -141,6 +152,38 @@ async def test_backend_host_processes_model_turn(tmp_path, monkeypatch):
         and event.item
         and event.item.role == "assistant"
         and "hello from react backend" in event.item.text
+        for event in events
+    )
+
+
+@pytest.mark.asyncio
+async def test_backend_host_emits_error_event_for_api_failures(tmp_path, monkeypatch):
+    """API 异常应进入前端协议，而不是只落到 backend stderr。"""
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENHARNESS_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("OPENHARNESS_DATA_DIR", str(tmp_path / "data"))
+
+    host = ReactBackendHost(BackendHostConfig(api_client=FailingApiClient()))
+    host._bundle = await build_runtime(api_client=FailingApiClient())
+    events = []
+
+    async def _emit(event):
+        events.append(event)
+
+    host._emit = _emit  # type: ignore[method-assign]
+    await start_runtime(host._bundle)
+    try:
+        should_continue = await host._handle_request(
+            FrontendRequest(type="submit_line", line="你好")
+        )
+    finally:
+        await close_runtime(host._bundle)
+
+    assert should_continue is True
+    assert host._busy is False
+    assert any(
+        event.type == "error" and event.message and "INVALID_API_KEY" in event.message
         for event in events
     )
 

@@ -2,6 +2,7 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
 import readline from 'node:readline';
 
+import {debugLog, getDebugLogPath} from '../debugProtocol.js';
 import type {
 	BackendEvent,
 	BridgeSessionSnapshot,
@@ -31,19 +32,33 @@ export function useBackendSession(config: FrontendConfig, onExit: (code?: number
 	const sendRequest = (payload: Record<string, unknown>): void => {
 		const child = childRef.current;
 		if (!child || child.stdin.destroyed) {
+			debugLog(`send skipped type=${String(payload.type ?? 'unknown')} child_stdin_unavailable`);
 			return;
 		}
+		const line = typeof payload.line === 'string' ? payload.line : '';
+		debugLog(`send type=${String(payload.type ?? 'unknown')} line_len=${line.length}`);
 		child.stdin.write(JSON.stringify(payload) + '\n');
 	};
 
 	useEffect(() => {
 		const [command, ...args] = config.backend_command;
+		debugLog(`useBackendSession start debug_log=${getDebugLogPath()}`);
+		debugLog(`spawn backend command=${command} args_count=${args.length}`);
+		const env = {...process.env};
+		// Ensure UTF-8 encoding for child process on all platforms
+		if (process.platform === 'win32') {
+			env.PYTHONUTF8 = '1';
+			env.PYTHONIOENCODING = 'utf-8';
+		}
 		const child = spawn(command, args, {
 			stdio: ['pipe', 'pipe', 'inherit'],
-			env: process.env,
+			env,
 		});
 		childRef.current = child;
+		debugLog(`backend spawned pid=${child.pid ?? 'unknown'}`);
 
+		// Ensure stdout is decoded as UTF-8
+		child.stdout.setEncoding('utf8');
 		const reader = readline.createInterface({input: child.stdout});
 		reader.on('line', (line) => {
 			if (!line.startsWith(PROTOCOL_PREFIX)) {
@@ -51,10 +66,12 @@ export function useBackendSession(config: FrontendConfig, onExit: (code?: number
 				return;
 			}
 			const event = JSON.parse(line.slice(PROTOCOL_PREFIX.length)) as BackendEvent;
+			debugLog(`event type=${event.type}`);
 			handleEvent(event);
 		});
 
 		child.on('exit', (code) => {
+			debugLog(`backend exit code=${code ?? 0}`);
 			setTranscript((items) => [...items, {role: 'system', text: `backend exited with code ${code ?? 0}`}]);
 			process.exitCode = code ?? 0;
 			onExit(code);

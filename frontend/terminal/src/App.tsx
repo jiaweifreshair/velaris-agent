@@ -8,10 +8,12 @@ import {SkillHubDemoBanner} from './components/SkillHubDemoBanner.js';
 import {PromptInput} from './components/PromptInput.js';
 import {SelectModal, type SelectOption} from './components/SelectModal.js';
 import {StatusBar} from './components/StatusBar.js';
+import {debugLog} from './debugProtocol.js';
 import {useBackendSession} from './hooks/useBackendSession.js';
 import type {FrontendConfig} from './types.js';
 
 const rawReturnSubmit =
+	process.platform === 'win32' ||
 	process.env.VELARIS_FRONTEND_RAW_RETURN === '1' ||
 	process.env.OPENHARNESS_FRONTEND_RAW_RETURN === '1';
 const scriptedSteps = (() => {
@@ -40,6 +42,10 @@ type SelectModalState = {
 } | null;
 
 export function App({config}: {config: FrontendConfig}): React.JSX.Element {
+	useEffect(() => {
+		debugLog(`app mounted platform=${process.platform} rawReturnSubmit=${rawReturnSubmit}`);
+	}, []);
+
 	const {exit} = useApp();
 	const [input, setInput] = useState('');
 	const [modalInput, setModalInput] = useState('');
@@ -49,6 +55,7 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 	const [pickerIndex, setPickerIndex] = useState(0);
 	const [selectModal, setSelectModal] = useState<SelectModalState>(null);
 	const [selectIndex, setSelectIndex] = useState(0);
+	const lastSubmitRef = React.useRef<{value: string; timestamp: number} | null>(null);
 	const demoMode = config.demo_mode ?? null;
 	const demoCases = config.demo_cases ?? [];
 	const isSkillHubDemo = demoMode === 'skillhub' && demoCases.length > 0;
@@ -168,6 +175,12 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 	};
 
 	useInput((chunk, key) => {
+		const isReturnInput = key.return || chunk === '\r' || chunk === '\n';
+		if (isReturnInput) {
+			debugLog(
+				`input return chunk_len=${chunk.length} busy=${session.busy} modal=${session.modal ? 'yes' : 'no'} selectModal=${selectModal ? 'yes' : 'no'} input_len=${input.length}`,
+			);
+		}
 		// Ctrl+C → exit
 		if (key.ctrl && chunk === 'c') {
 			session.sendRequest({type: 'shutdown'});
@@ -209,7 +222,7 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 		}
 
 		// --- Scripted raw return ---
-		if (rawReturnSubmit && key.return) {
+		if (rawReturnSubmit && isReturnInput) {
 			if (session.modal?.kind === 'question') {
 				session.sendRequest({
 					type: 'question_response',
@@ -221,6 +234,7 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 				return;
 			}
 			if (!session.modal && !session.busy && input.trim()) {
+				debugLog(`raw return submit input_len=${input.trim().length}`);
 				onSubmit(input);
 				return;
 			}
@@ -319,6 +333,15 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 	});
 
 	const onSubmit = (value: string): void => {
+		const normalizedValue = value.trim();
+		debugLog(`onSubmit value_len=${normalizedValue.length} busy=${session.busy} modal=${session.modal ? 'yes' : 'no'}`);
+		const now = Date.now();
+		const lastSubmit = lastSubmitRef.current;
+		if (lastSubmit && lastSubmit.value === normalizedValue && now - lastSubmit.timestamp < 250) {
+			return;
+		}
+		lastSubmitRef.current = {value: normalizedValue, timestamp: now};
+
 		if (session.modal?.kind === 'question') {
 			session.sendRequest({
 				type: 'question_response',
@@ -329,7 +352,7 @@ export function App({config}: {config: FrontendConfig}): React.JSX.Element {
 			setModalInput('');
 			return;
 		}
-		if (!value.trim() || session.busy) {
+		if (!normalizedValue || session.busy) {
 			return;
 		}
 		// Check if it's an interactive command
