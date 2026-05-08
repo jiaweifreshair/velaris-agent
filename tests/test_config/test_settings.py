@@ -125,14 +125,25 @@ class TestLoadSaveSettings:
         assert s.security.scan_project_instructions is False
 
     def test_load_applies_env_overrides_model(self, tmp_path: Path, monkeypatch):
-        """Env var 应覆盖文件中已配置的 model 值。"""
+        """Env var 应覆盖文件中未显式设置的 model 值（默认值场景）。"""
         path = tmp_path / "settings.json"
-        path.write_text(json.dumps({"model": "from-file", "base_url": "https://file.example"}))
+        # 文件中 model 为默认值，env 应能覆盖
+        path.write_text(json.dumps({"base_url": "https://file.example"}))
         monkeypatch.setenv("ANTHROPIC_MODEL", "from-env-model")
 
         s = load_settings(path)
 
         assert s.model == "from-env-model"
+
+    def test_load_applies_env_overrides_model_preserves_explicit_value(self, tmp_path: Path, monkeypatch):
+        """Env var 不应覆盖文件中显式设置的 model 值（PR #4 行为）。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"model": "from-file"}))
+        monkeypatch.setenv("ANTHROPIC_MODEL", "from-env-model")
+
+        s = load_settings(path)
+
+        assert s.model == "from-file"
 
     def test_load_applies_env_overrides_base_url(self, tmp_path: Path, monkeypatch):
         """Env var 应覆盖文件中已配置的 base_url 值。"""
@@ -146,14 +157,25 @@ class TestLoadSaveSettings:
         assert s.base_url == "https://env.example/anthropic"
 
     def test_load_applies_env_overrides_api_key(self, tmp_path: Path, monkeypatch):
-        """Env var 应覆盖文件中已配置的 api_key 值。"""
+        """Env var 应覆盖文件中未显式设置的 api_key 值。"""
         path = tmp_path / "settings.json"
-        path.write_text(json.dumps({"model": "from-file", "api_key": "sk-from-file"}))
+        # 文件中 api_key 为空，env 应能覆盖
+        path.write_text(json.dumps({"model": "from-file"}))
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-override")
 
         s = load_settings(path)
 
         assert s.api_key == "sk-env-override"
+
+    def test_load_applies_env_overrides_api_key_preserves_explicit_value(self, tmp_path: Path, monkeypatch):
+        """Env var 不应覆盖文件中显式设置的 api_key 值（PR #4 行为）。"""
+        path = tmp_path / "settings.json"
+        path.write_text(json.dumps({"api_key": "sk-from-file"}))
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-override")
+
+        s = load_settings(path)
+
+        assert s.api_key == "sk-from-file"
 
     def test_load_applies_provider_env_override(self, tmp_path: Path, monkeypatch):
         """Env var 应覆盖文件中已配置的 provider 值。"""

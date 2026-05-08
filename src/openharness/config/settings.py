@@ -166,7 +166,8 @@ def _apply_env_overrides(settings: Settings) -> Settings:
         or os.environ.get("VELARIS_MODEL")
         or os.environ.get("OPENHARNESS_MODEL")
     )
-    if model:
+    # PR #4: Only override if not explicitly set in file
+    if model and (not settings.model or settings.model == Settings().model):
         updates["model"] = model
 
     candidate = settings.model_copy(update=updates) if updates else settings
@@ -215,7 +216,8 @@ def _apply_env_overrides(settings: Settings) -> Settings:
         api_key=candidate.api_key,
         api_format=candidate.api_format,
     )
-    if api_key:
+    # PR #4: Only override if not explicitly set in file
+    if api_key and not candidate.api_key:
         updates["api_key"] = api_key
 
     if not updates:
