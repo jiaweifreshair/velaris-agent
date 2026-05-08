@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from openharness.api.client import SupportsStreamingMessages
+from openharness.api.errors import OpenHarnessApiError
 from openharness.bridge import get_bridge_manager
 from openharness.engine.stream_events import (
     AssistantTextDelta,
@@ -82,36 +83,8 @@ class ReactBackendHost:
         try:
             while self._running:
                 request = await self._request_queue.get()
-                if request.type == "shutdown":
-                    await self._emit(BackendEvent(type="shutdown"))
-                    break
-                if request.type == "permission_response":
-                    if request.request_id in self._permission_requests:
-                        self._permission_requests[request.request_id].set_result(bool(request.allowed))
-                    continue
-                if request.type == "question_response":
-                    if request.request_id in self._question_requests:
-                        self._question_requests[request.request_id].set_result(request.answer or "")
-                    continue
-                if request.type == "list_sessions":
-                    await self._handle_list_sessions()
-                    continue
-                if request.type != "submit_line":
-                    await self._emit(BackendEvent(type="error", message=f"Unknown request type: {request.type}"))
-                    continue
-                if self._busy:
-                    await self._emit(BackendEvent(type="error", message="Session is busy"))
-                    continue
-                line = (request.line or "").strip()
-                if not line:
-                    continue
-                self._busy = True
-                try:
-                    should_continue = await self._process_line(line)
-                finally:
-                    self._busy = False
+                should_continue = await self._handle_request(request)
                 if not should_continue:
-                    await self._emit(BackendEvent(type="shutdown"))
                     break
         finally:
             reader.cancel()
@@ -122,12 +95,17 @@ class ReactBackendHost:
         return 0
 
     async def _read_requests(self) -> None:
+        import io
+        # Ensure stdin is properly configured for UTF-8 on all platforms
+        if sys.stdin.encoding and sys.stdin.encoding.lower() not in ('utf-8', 'utf8'):
+            sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
+
         while True:
-            raw = await asyncio.to_thread(sys.stdin.buffer.readline)
+            raw = await asyncio.to_thread(sys.stdin.readline)
             if not raw:
                 await self._request_queue.put(FrontendRequest(type="shutdown"))
                 return
-            payload = raw.decode("utf-8").strip()
+            payload = raw.strip()
             if not payload:
                 continue
             try:
@@ -136,6 +114,49 @@ class ReactBackendHost:
                 await self._emit(BackendEvent(type="error", message=f"Invalid request: {exc}"))
                 continue
             await self._request_queue.put(request)
+
+    async def _handle_request(self, request: FrontendRequest) -> bool:
+        """Dispatch one frontend request and keep backend errors visible to the UI."""
+
+        try:
+            if request.type == "shutdown":
+                await self._emit(BackendEvent(type="shutdown"))
+                return False
+            if request.type == "permission_response":
+                if request.request_id in self._permission_requests:
+                    self._permission_requests[request.request_id].set_result(bool(request.allowed))
+                return True
+            if request.type == "question_response":
+                if request.request_id in self._question_requests:
+                    self._question_requests[request.request_id].set_result(request.answer or "")
+                return True
+            if request.type == "list_sessions":
+                await self._handle_list_sessions()
+                return True
+            if request.type != "submit_line":
+                await self._emit(BackendEvent(type="error", message=f"Unknown request type: {request.type}"))
+                return True
+            if self._busy:
+                await self._emit(BackendEvent(type="error", message="Session is busy"))
+                return True
+            line = (request.line or "").strip()
+            if not line:
+                return True
+            self._busy = True
+            try:
+                should_continue = await self._process_line(line)
+            finally:
+                self._busy = False
+            if not should_continue:
+                await self._emit(BackendEvent(type="shutdown"))
+                return False
+            return True
+        except OpenHarnessApiError as exc:
+            await self._emit(BackendEvent(type="error", message=str(exc)))
+            return True
+        except Exception as exc:
+            await self._emit(BackendEvent(type="error", message=str(exc)))
+            return True
 
     async def _process_line(self, line: str) -> bool:
         assert self._bundle is not None

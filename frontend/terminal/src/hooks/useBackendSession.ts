@@ -38,12 +38,20 @@ export function useBackendSession(config: FrontendConfig, onExit: (code?: number
 
 	useEffect(() => {
 		const [command, ...args] = config.backend_command;
+		const env = {...process.env};
+		// Ensure UTF-8 encoding for child process on all platforms
+		if (process.platform === 'win32') {
+			env.PYTHONUTF8 = '1';
+			env.PYTHONIOENCODING = 'utf-8';
+		}
 		const child = spawn(command, args, {
 			stdio: ['pipe', 'pipe', 'inherit'],
-			env: process.env,
+			env,
 		});
 		childRef.current = child;
 
+		// Ensure stdout is decoded as UTF-8
+		child.stdout.setEncoding('utf8');
 		const reader = readline.createInterface({input: child.stdout});
 		reader.on('line', (line) => {
 			if (!line.startsWith(PROTOCOL_PREFIX)) {
