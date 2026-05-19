@@ -75,6 +75,8 @@ async def test_launch_react_tui_forwards_runtime_overrides(tmp_path, monkeypatch
         ],
     )
 
+    assert "stdout" not in captured["kwargs"]
+    assert "stderr" not in captured["kwargs"]
     frontend_config = json.loads(captured["kwargs"]["env"]["VELARIS_FRONTEND_CONFIG"])  # type: ignore[index]
     backend_command = frontend_config["backend_command"]
     assert backend_command[:3] == [backend_command[0], "-m", "velaris_agent"]
