@@ -265,11 +265,9 @@ async def launch_react_tui(
         env["ANTHROPIC_API_KEY"] = api_key
         env["VELARIS_API_KEY"] = api_key
 
-    # Direct backend stdout/stderr to the log file via a real file descriptor.
     logs_dir = get_logs_dir()
     log_file_path = logs_dir / _LOG_FILE_NAME
-    log_fd = os.open(log_file_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-    logger.info("launching React TUI (stdout/stderr → %s)", log_file_path)
+    logger.info("launching React TUI in current terminal (logs → %s)", log_file_path)
 
     process = await asyncio.create_subprocess_exec(
         npm,
@@ -280,11 +278,8 @@ async def launch_react_tui(
         cwd=str(frontend_dir),
         env=env,
         stdin=None,
-        stdout=log_fd,
-        stderr=log_fd,
     )
     retcode = await process.wait()
-    os.close(log_fd)
     logger.info("React TUI exited with code %d", retcode)
     return retcode
 
